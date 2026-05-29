@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Wallet — daily PostgreSQL backup script (P1 infra).
+#
+# Schedule:
+#   sudo crontab -u wallet -e
+#     # m h dom mon dow command
+#     15 3 * * * /opt/wallet/deploy/backup.sh
+#
+# What it does:
+#   1. pg_dump to a gzip'd file in $BACKUP_DIR with date+time suffix
+#   2. Trim backups older than $BACKUP_RETENTION_DAYS
+#   3. Echoes one structured line per run (parseable by log aggregator)
+#
+# Required env (read from /opt/wallet/apps/api/.env or a sibling file):
+#   DATABASE_URL
+#   Optional overrides:
+#     BACKUP_DIR=/var/backups/wallet
+#     BACKUP_RETENTION_DAYS=14
+
+set -euo pipefail
+
+ENV_FILE="${ENV_FILE:-/opt/wallet/apps/api/.env}"
+if [ -f "$ENV_FILE" ]; then
+  set -a; . "$ENV_FILE"; set +a
+fi
+
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "{\"level\":\"error\",\"msg\":\"DATABASE_URL not set\"}" >&2
+  exit 1
+fi
+
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/wallet}"
+BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
+
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+TARGET="$BACKUP_DIR/wallet-$STAMP.sql.gz"
+
+START_TS=$(date +%s)
+# --no-owner / --no-privileges → portable to a fresh role on restore.
+# Format=plain + gzip → diff-able + cheap to compress further offsite.
+pg_dump "$DATABASE_URL" --no-owner --no-privileges --format=plain \
+  | gzip -c > "$TARGET.tmp"
+mv "$TARGET.tmp" "$TARGET"
+chmod 600 "$TARGET"
+END_TS=$(date +%s)
+
+SIZE_BYTES=$(stat -c%s "$TARGET" 2>/dev/null || stat -f%z "$TARGET")
+DURATION=$((END_TS - START_TS))
+
+# Trim old backups.
+TRIMMED=0
+if [ "$BACKUP_RETENTION_DAYS" -gt 0 ]; then
+  TRIMMED=$(find "$BACKUP_DIR" -type f -name 'wallet-*.sql.gz' -mtime "+$BACKUP_RETENTION_DAYS" -print -delete | wc -l)
+fi
+
+echo "{\"level\":\"info\",\"msg\":\"wallet backup ok\",\"target\":\"$TARGET\",\"size_bytes\":$SIZE_BYTES,\"duration_sec\":$DURATION,\"trimmed\":$TRIMMED}"

@@ -1,0 +1,11 @@
+---
+description: Katı kural — tüm yanıtlar her zaman Türkçe
+alwaysApply: true
+---
+
+# Katı kural: Her zaman Türkçe
+
+- Kullanıcıya yönelik **tüm** yanıtlar **Türkçe** yazılır.
+- Kod, dosya yolu, komut, API alan adı gibi teknik terimler orijinal dilde kalabilir.
+- İngilizce paragraf veya özet kullanılmaz (kullanıcı açıkça İngilizce istemedikçe).
+- Commit mesajı / PR kullanıcı istemedikçe Türkçe tercih edilir.

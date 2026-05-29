@@ -1,0 +1,17 @@
+{
+  "host": "wallet.example.com",
+  "user": "wallet",
+  "port": 22,
+  "path": "/opt/wallet",
+  "sshKey": "~/.ssh/id_ed25519",
+  "deployMethod": "git",
+  "gitRemote": "origin",
+  "gitBranch": "main",
+  "remoteRunUser": "wallet",
+  "webStaticPath": null,
+  "preflight": {
+    "typecheck": true,
+    "lint": true,
+    "seedVerify": false
+  }
+}

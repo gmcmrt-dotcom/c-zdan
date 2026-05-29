@@ -1,0 +1,38 @@
+---
+description: "+" deploy komutu — production'a otomatik gönderim
+alwaysApply: true
+---
+
+# Deploy "+" komutu
+
+Kullanıcı mesajı **tam olarak** şunlardan biri olduğunda bu kural geçerlidir:
+
+- `+`
+- `deploy`
+- `sunucuya gönder`
+
+## Agent davranışı
+
+1. **Ön kontrol:** `deploy.config.json` var mı?
+   - Yoksa → `docs/DEPLOY_PLUS.md` § Tek seferlik kurulum adımlarını Türkçe özetle; deploy çalıştırma.
+2. **Durum özeti:** `git status --short` ve config'deki `host` / `path` bilgisini kullanıcıya göster.
+3. **Onay zorunlu:** Kullanıcı açıkça onaylamadan `npm run deploy` çalıştırma.
+   - Onay örneği: "evet", "onayla", "deploy et", "gönder"
+4. **Deploy:** Onay sonrası proje kökünden:
+   ```bash
+   npm run deploy -- --yes
+   ```
+   İnteraktif onay tercih edilirse `npm run deploy` (onay script içinde sorulur).
+5. **Sonuç:** Başarı/hata özetini Türkçe raporla. Hata varsa `docs/DEPLOY_PLUS.md` § Sorun giderme'ye yönlendir.
+
+## Güvenlik
+
+- `typecheck` başarısızsa deploy script durur — agent bunu bypass etmez.
+- `deploy.config.json` commit edilmemeli (gitignored).
+- Gerçek sunucu bilgisi yoksa deploy denemesi yapma; kurulum talimatı ver.
+
+## Referans
+
+- Tam rehber: `docs/DEPLOY_PLUS.md`
+- Genel deploy: `docs/DEPLOY_WORKFLOW.md`
+- Script: `scripts/deploy-plus.mjs`

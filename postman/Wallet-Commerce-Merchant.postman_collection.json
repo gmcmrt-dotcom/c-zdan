@@ -1,0 +1,117 @@
+{
+  "info": {
+    "_postman_id": "wallet-commerce-merchant-api",
+    "name": "Wallet — Commerce Merchant API",
+    "description": "Flow A (POST /merchant-api/charge) and Flow B (POST /merchant-api/credit).\n\nSetup:\n1. Set collection variables: base_url, api_key, signing_secret\n2. Collection pre-request script signs every request automatically.\n3. For child stores: api_key = child key, signing_secret = parent secret.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://wallet.example.com/merchant-api",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "signing_secret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "merchant_ref",
+      "value": "TEST-{{$timestamp}}",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const secret = pm.collectionVariables.get('signing_secret');",
+          "const apiKey = pm.collectionVariables.get('api_key');",
+          "if (!secret || !apiKey) {",
+          "  console.warn('Set api_key and signing_secret in collection variables');",
+          "}",
+          "const ts = Math.floor(Date.now() / 1000).toString();",
+          "let body = pm.request.body && pm.request.body.mode === 'raw' ? (pm.request.body.raw || '') : '';",
+          "const msg = ts + ':' + body;",
+          "const sig = CryptoJS.HmacSHA256(msg, secret).toString(CryptoJS.enc.Hex);",
+          "pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+          "pm.request.headers.upsert({ key: 'x-merchant-key', value: apiKey });",
+          "pm.request.headers.upsert({ key: 'x-merchant-timestamp', value: ts });",
+          "pm.request.headers.upsert({ key: 'x-merchant-signature', value: sig });",
+          "const ref = pm.collectionVariables.get('merchant_ref');",
+          "if (ref) pm.request.headers.upsert({ key: 'x-merchant-ref', value: ref });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Flow A — Payment (POST /charge)",
+      "item": [
+        {
+          "name": "Consume payment code",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"AB12CD34\",\n  \"amount\": 100,\n  \"customer_name\": \"Ali Yilmaz\",\n  \"note\": \"Test order\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/charge",
+            "description": "Member must generate an 8-char code in Wallet first. amount and customer_name must match the code."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Flow B — Credit member (POST /credit)",
+      "item": [
+        {
+          "name": "Transfer to member wallet",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_no\": \"00010001\",\n  \"customer_name\": \"Ali Yilmaz\",\n  \"amount\": 50,\n  \"note\": \"Test withdrawal to wallet\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/credit",
+            "description": "wallet_no = member_no. Not a refund — member withdraws their balance on your platform."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Parent — Child upsert (POST /child-upsert)",
+      "item": [
+        {
+          "name": "Upsert child stores",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"children\": [\n    {\n      \"external_sub_merchant_ref\": \"STORE-01\",\n      \"name\": \"Test Store\",\n      \"commission_pct\": 2.5,\n      \"per_tx_limit\": 50000,\n      \"daily_limit\": 500000,\n      \"is_active\": true\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{base_url}}/child-upsert",
+            "description": "Parent API key + parent signing secret only. x-merchant-ref is required."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

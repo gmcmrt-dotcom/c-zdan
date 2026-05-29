@@ -1,0 +1,237 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Y?ld?z Cüzdan ? Banka temal? tasar?m sistemi
+   Tüm renkler HSL format?nda. */
+
+@layer base {
+  :root {
+    --background : 210 33% 98%;
+    --foreground : 222 47% 11%;
+
+      --card: 0 0% 100%;
+      --card-foreground : 222 47% 11%;
+
+      --popover: 0 0% 100%;
+      --popover-foreground : 222 47% 11%;
+
+      /* Derin banka mavisi (#0A3D91 ailesi) */
+      --primary: 217 87% 30%;
+      --primary-foreground : 210 40% 98%;
+      --primary-glow : 207 90% 54%;
+      --primary-deep : 220 90% 18%;
+
+      --secondary : 210 40% 96%;
+      --secondary-foreground : 217 87% 30%;
+
+      --muted: 210 30% 95%;
+      --muted-foreground : 215 16% 45%;
+
+      --accent: 199 89% 48%;
+      --accent-foreground : 210 40% 98%;
+
+      --destructive : 0 75% 50%;
+      --destructive-foreground : 210 40% 98%;
+
+      --success: 142 71% 38%;
+      --success-foreground : 0 0% 100%;
+
+      --warning: 38 92% 50%;
+      --warning-foreground : 222 47% 11%;
+
+      --gold: 43 89% 48%;
+      --gold-foreground : 222 47% 11%;
+
+      --border: 214 32% 91%;
+      --input: 214 32% 91%;
+      --ring: 217 87% 30%;
+
+      --radius: 1rem;
+
+      /* Gradients */
+      --gradient-card : linear-gradient(135deg, hsl(220 90% 18%) 0%, hsl(217 87% 30%) 55%, hsl(207 90% 54%) 100%);
+      --gradient-card-gold : linear-gradient(135deg, hsl(220 90% 18%) 0%, hsl(43 89% 48%) 100%);
+      --gradient-bg : linear-gradient(180deg, hsl(210 33% 98%) 0%, hsl(210 40% 95%) 100%);
+
+      /* Shadows */
+      --shadow-card : 0 10px 30px -12px hsl(217 87% 30% / 0.25);
+      --shadow-soft : 0 2px 12px -2px hsl(217 87% 30% / 0.10);
+      --shadow-elevated : 0 20px 50px -20px hsl(220 90% 18% / 0.35);
+
+      /* Sidebar (back office) */
+      --sidebar-background : 220 90% 18%;
+      --sidebar-foreground : 210 40% 96%;
+      --sidebar-primary : 207 90% 54%;
+      --sidebar-primary-foreground : 220 90% 12%;
+      --sidebar-accent : 217 60% 25%;
+      --sidebar-accent-foreground : 210 40% 98%;
+      --sidebar-border : 217 60% 25%;
+      --sidebar-ring : 207 90% 54%;
+  }
+
+  .dark {
+    --background : 222 47% 7%;
+    --foreground : 210 40% 96%;
+
+      --card: 222 40% 11%;
+      --card-foreground : 210 40% 96%;
+
+      --popover: 222 40% 11%;
+      --popover-foreground : 210 40% 96%;
+
+      --primary: 207 90% 54%;
+      --primary-foreground : 222 47% 7%;
+      --primary-glow : 199 89% 60%;
+      --primary-deep : 217 87% 25%;
+
+      --secondary : 217 33% 17%;
+      --secondary-foreground : 210 40% 96%;
+
+     --muted: 217 33% 14%;
+     --muted-foreground : 215 16% 65%;
+
+     --accent: 199 89% 48%;
+     --accent-foreground : 222 47% 7%;
+
+     --destructive : 0 70% 50%;
+     --destructive-foreground : 210 40% 98%;
+
+     --success: 142 60% 45%;
+     --success-foreground : 0 0% 100%;
+
+     --warning: 38 92% 55%;
+     --warning-foreground : 222 47% 11%;
+
+     --gold: 43 89% 55%;
+     --gold-foreground : 222 47% 7%;
+
+     --border: 217 33% 20%;
+     --input: 217 33% 20%;
+     --ring: 207 90% 54%;
+
+     --gradient-card : linear-gradient(135deg, hsl(217 87% 20%) 0%, hsl(207 90% 40%) 100%);
+     --shadow-card : 0 10px 30px -12px hsl(0 0% 0% / 0.5);
+
+     --sidebar-background : 222 47% 5%;
+     --sidebar-foreground : 210 40% 96%;
+     --sidebar-primary : 207 90% 54%;
+     --sidebar-primary-foreground : 222 47% 7%;
+     --sidebar-accent : 217 33% 14%;
+     --sidebar-accent-foreground : 210 40% 96%;
+     --sidebar-border : 217 33% 14%;
+     --sidebar-ring : 207 90% 54%;
+   }
+}
+
+@layer base {
+   * {
+     @apply border-border ;
+   }
+
+   html, body {
+     @apply bg-background text-foreground antialiased ;
+     font-feature-settings : "cv11", "ss01";
+     font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+     overflow-x: hidden;
+   }
+
+   /* Grid/flex çocukları taşmayı önler — özet kart rakamları için kritik */
+   .grid > *,
+   .flex > * {
+     min-width: 0;
+   }
+
+   .tabular {
+     font-variant-numeric : tabular-nums;
+     font-feature-settings : "tnum";
+   }
+
+   /* Number input spinner butonlarini tum sistemde kaldir — klavyeden yazilsin */
+   input[type="number"]::-webkit-inner-spin-button,
+   input[type="number"]::-webkit-outer-spin-button {
+     -webkit-appearance: none;
+     margin: 0;
+   }
+   input[type="number"] {
+     -moz-appearance: textfield;
+     appearance: textfield;
+   }
+}
+
+@layer components {
+  /* Özet kart — rakam kart genişliğine göre küçülür */
+  .stat-card {
+    container-type: inline-size;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .stat-card__label {
+    font-size: 0.75rem;
+    line-height: 1.25;
+    color: hsl(var(--muted-foreground));
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stat-value-wrap {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .stat-value-wrap--wrap {
+    overflow: visible;
+  }
+  .stat-value {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    font-weight: 600;
+    line-height: 1.15;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stat-value--wrap {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    word-break: break-word;
+  }
+  .stat-value--sm {
+    font-size: clamp(0.8125rem, 7cqi, 1.125rem);
+  }
+  .stat-value--md {
+    font-size: clamp(0.875rem, 9cqi, 1.5rem);
+  }
+  .stat-value--lg {
+    font-size: clamp(1rem, 10cqi, 1.75rem);
+  }
+  .stat-value--hero {
+    font-weight: 700;
+    font-size: clamp(1.125rem, 14cqi, 2.25rem);
+  }
+
+   .bank-card {
+     container-type: inline-size;
+     min-width: 0;
+     background: var(--gradient-card );
+     box-shadow: var(--shadow-elevated );
+     color: hsl(var(--primary-foreground ));
+   }
+   .bank-card .stat-value,
+   .bank-card .stat-card__label {
+     color: inherit;
+   }
+   .gold-card {
+     background: var(--gradient-card-gold );
+     box-shadow: var(--shadow-elevated );
+   }
+   .soft-card {
+     background: hsl(var(--card));
+     box-shadow: var(--shadow-soft);
+     border: 1px solid hsl(var(--border));
+   }
+}

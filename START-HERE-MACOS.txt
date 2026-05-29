@@ -1,0 +1,13 @@
+┌────────────────────────────────────────────────────────────────┐
+│                                                                │
+│   Welcome to Wallet — macOS                                    │
+│                                                                │
+│   Open Terminal, then:                                         │
+│                                                                │
+│     cd installers/macos                                        │
+│     ./install.sh        (first time only)                      │
+│     ./start.sh          (every day)                            │
+│                                                                │
+│   Full docs:    installers/macos/README.txt                    │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘

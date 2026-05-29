@@ -1,0 +1,86 @@
+-- Wallet — production Postgres role split (P0-14).
+--
+-- Today the installer creates `wallet` with SUPERUSER, so the API has full
+-- DDL + DML on every object in the cluster. This file is the migration to a
+-- two-role model:
+--
+--   wallet_migrate -- owns the schema, runs migrations + seeds
+--   wallet_app     -- the API connects as this; DML only, no DDL, no superuser
+--
+-- Apply ONCE per cluster as the postgres superuser:
+--
+--   sudo -u postgres psql -d wallet -f deploy/postgres-roles.sql.example
+--
+-- Then update DATABASE_URL on the API host to use wallet_app, and provision
+-- migrations to run with a separate DATABASE_URL pointing at wallet_migrate.
+
+-- 0. Create the new roles (no SUPERUSER, no CREATEDB, no CREATEROLE).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'wallet_migrate') THEN
+    CREATE ROLE wallet_migrate LOGIN PASSWORD :'WALLET_MIGRATE_PASS';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'wallet_app') THEN
+    CREATE ROLE wallet_app LOGIN PASSWORD :'WALLET_APP_PASS';
+  END IF;
+END $$;
+
+-- 1. wallet_migrate owns the schema. Existing tables (created when the
+--    cluster ran as `wallet`) get reparented; new tables created by
+--    migrations will be owned by wallet_migrate automatically.
+GRANT ALL ON SCHEMA public TO wallet_migrate;
+ALTER SCHEMA public OWNER TO wallet_migrate;
+
+-- Reassign every owned object so the legacy SUPERUSER `wallet` is no longer
+-- needed. After this, you can either:
+--   a) keep `wallet` as a noop role (no LOGIN), or
+--   b) drop it entirely once nothing connects with it.
+REASSIGN OWNED BY wallet TO wallet_migrate;
+
+-- 2. wallet_app gets DML on every table + sequence, NO ddl, NO drop, NO
+--    truncate, NO references to other schemas. Crucially: NO TRUNCATE / DROP /
+--    REVOKE-of-grants so it cannot wipe audit tables.
+GRANT USAGE ON SCHEMA public TO wallet_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES    IN SCHEMA public TO wallet_app;
+GRANT USAGE, SELECT                  ON ALL SEQUENCES IN SCHEMA public TO wallet_app;
+GRANT EXECUTE                        ON ALL FUNCTIONS IN SCHEMA public TO wallet_app;
+
+-- Make wallet_app inherit grants on FUTURE tables created by migrations.
+ALTER DEFAULT PRIVILEGES FOR ROLE wallet_migrate IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO wallet_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE wallet_migrate IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO wallet_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE wallet_migrate IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO wallet_app;
+
+-- 3. Append-only tables — wallet_app may INSERT but never UPDATE/DELETE.
+--    This is the DB-side enforcement that complements the application
+--    audit write helper. Even a compromised app process cannot rewrite
+--    history once a row is logged.
+--
+-- H4 — Added `admin_idempotency` to the list. The dedup cache MUST be
+-- append-only (modulo TTL sweep by a separate cron, which can run as
+-- wallet_migrate); otherwise an admin who could DELETE rows could
+-- replay a money-moving submission with the same idempotency_key to
+-- bypass the dedup.
+REVOKE UPDATE, DELETE ON
+  audit_log,
+  merchant_settlement_log,
+  merchant_cash_pool_log,
+  merchant_api_calls,
+  merchant_secret_rotations,
+  provider_ledger,
+  admin_idempotency
+FROM wallet_app;
+-- (Keep INSERT + SELECT; UPDATE/DELETE explicitly revoked.)
+--
+-- NOTE: the daily `purge_*` crons (token purge, idempotency TTL sweep)
+-- need DELETE on the relevant table. Run those crons via a separate
+-- DATABASE_URL pointing at `wallet_migrate` (or grant `wallet_app`
+-- targeted DELETE on the NON-audit tables only). The simplest path
+-- is to schedule the crons as a `wallet_migrate`-connected sidecar.
+
+-- 4. Operational sanity: revoke the previous superuser bit so a misconfigured
+--    DATABASE_URL (pointing at wallet) cannot accidentally execute DDL.
+ALTER ROLE wallet NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN;
+-- If you want to fully retire the role, run `DROP ROLE wallet;` after
+-- confirming nothing depends on it.

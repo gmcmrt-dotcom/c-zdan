@@ -1,0 +1,64 @@
+# Systemd unit for the wallet API.
+#
+# Install:
+#   sudo cp deploy/wallet-api.service.example /etc/systemd/system/wallet-api.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now wallet-api.service
+#
+# Tail logs:
+#   sudo journalctl -u wallet-api -f
+#
+# Health:
+#   curl -fsS http://127.0.0.1:3000/health
+#   curl -fsS http://127.0.0.1:3000/readyz
+
+[Unit]
+Description=Wallet API (Express + Drizzle + Socket.IO)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wallet
+Group=wallet
+WorkingDirectory=/opt/wallet
+EnvironmentFile=/opt/wallet/apps/api/.env
+ExecStart=/usr/bin/node /opt/wallet/apps/api/dist/index.js
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wallet-api
+
+# Process hardening — block common attack primitives. None of these
+# should affect normal operation; comment a line out if a future feature
+# legitimately needs the capability.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@mount @reboot @swap @raw-io @debug
+
+# Allow writes only to the storage + logs directories.
+ReadWritePaths=/opt/wallet/storage /opt/wallet/apps/api/logs
+
+# Resource caps (tune for your host).
+LimitNOFILE=65536
+MemoryHigh=2G
+MemoryMax=3G
+
+[Install]
+WantedBy=multi-user.target

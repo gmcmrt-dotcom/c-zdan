@@ -1,0 +1,38 @@
+{
+  "name": "wallet",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:api dev:web",
+    "dev:web": "npm --workspace apps/web run dev",
+    "dev:api": "npm --workspace apps/api run dev",
+    "build": "npm --workspace packages/shared run build && npm --workspace apps/api run build && npm --workspace apps/web run build",
+    "db:push": "npm --workspace apps/api run db:push",
+    "db:migrate": "npm --workspace apps/api run db:migrate",
+    "db:seed": "npm --workspace apps/api run db:seed",
+    "db:reset": "node scripts/db-reset.mjs",
+    "admin:bootstrap": "npm --workspace apps/api run admin:bootstrap",
+    "test:seed": "node scripts/seed-test-fixtures.mjs",
+    "test:seed:verify": "tsx scripts/verify-seed-ledger.mjs",
+    "test:bo-overrides": "node scripts/test-bo-overrides.mjs",
+    "verify:admin-perms": "node scripts/verify-admin-perms.mjs",
+    "lint": "npm --workspace apps/web run lint",
+    "typecheck": "npm --workspace apps/web exec -- tsc --noEmit && npm --workspace apps/api exec -- tsc --noEmit",
+    "deploy": "node scripts/deploy-plus.mjs",
+    "deploy:plus": "node scripts/deploy-plus.mjs",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "test:e2e:ui": "playwright test --config e2e/playwright.config.ts --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "npm-run-all": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

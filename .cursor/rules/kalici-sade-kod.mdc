@@ -1,0 +1,13 @@
+---
+description: Katı kural — yama kod yok; kalıcı ve en sade çözüm
+alwaysApply: true
+---
+
+# Katı kural: Kalıcı çözüm, sade kod — yama yok
+
+- **Yama kod yazma:** Geçici workaround, hack, `// TODO fix later`, duplicate logic, bypass guard, commented-out dead code ile sorunu örtme.
+- **Bug fix:** Kök nedeni düzelt; minimal ama **kalıcı** diff. Semptom bastırmak yerine doğru katmanda (servis, şema, tip, UI sözleşmesi) çöz.
+- **Geliştirme:** En sade doğru tasarım; gereksiz abstraction, over-engineering ve drive-by refactor yok — ama teknik borç biriktiren kısayol da yok.
+- **Öncelik sırası:** (1) doğruluk ve invariant'lara uyum, (2) minimal diff, (3) mevcut proje kalıplarına uyum.
+- **Kabul edilebilir:** Küçük diff yine kalıcı olabilir; "küçük" ≠ "yama".
+- **Kabul edilemez:** Feature flag ile sonsuza kadar kırık bırakma, sadece UI'da hatayı gizleme, copy-paste duplicate handler.

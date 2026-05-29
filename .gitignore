@@ -1,0 +1,33 @@
+# Yerel deploy yapılandırması — asla commit etmeyin
+deploy.config.json
+.env.deploy
+
+# Ortam dosyaları
+.env
+.env.local
+.env.*.local
+apps/api/.env
+apps/web/.env.local
+
+# Bağımlılıklar ve build çıktıları
+node_modules/
+apps/api/dist/
+apps/web/dist/
+packages/shared/dist/
+
+# Runtime / upload
+apps/api/storage/
+apps/api/logs/
+storage/
+
+# Test çıktıları
+e2e/test-results/
+e2e/playwright-report/
+e2e/.auth/
+
+# macOS
+.DS_Store
+
+# Installer logları
+installers/linux/logs/
+installers/macos/logs/

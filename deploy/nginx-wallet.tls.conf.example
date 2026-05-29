@@ -1,0 +1,180 @@
+# Wallet — production nginx with TLS (Let's Encrypt / managed cert)
+#
+# Copy to /etc/nginx/sites-available/wallet-tls, edit `server_name` + cert paths,
+# then `sudo ln -s ../sites-available/wallet-tls /etc/nginx/sites-enabled/` and
+# `sudo nginx -t && sudo systemctl reload nginx`.
+#
+# Replaces the HTTP-only `nginx-wallet.conf.example`. After you provision a
+# cert (e.g. `sudo certbot --nginx -d wallet.example.com`), remove or comment
+# out the plaintext template and use this one.
+#
+# What this template gets right (P0-13):
+#   - TLS 1.2/1.3 only, modern Mozilla cipher list
+#   - HTTP → HTTPS 301 redirect (no plaintext leaks)
+#   - HSTS with includeSubDomains (preload-ready after staging burn-in)
+#   - OCSP stapling
+#   - X-Content-Type-Options, Referrer-Policy, X-Frame-Options, Permissions-Policy
+#   - per-merchant-api / per-auth burst limit (defense in depth above the
+#     Express express-rate-limit added in P0-15)
+#   - proxy_request_buffering off on /merchant-api/* and /webhooks/* so the raw
+#     body reaches Express for HMAC verification
+
+# ---------- rate-limit zones ----------
+limit_req_zone $binary_remote_addr zone=wallet_auth:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=wallet_api:10m  rate=30r/s;
+limit_req_zone $binary_remote_addr zone=wallet_merch:10m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=wallet_conn:10m;
+
+upstream wallet_api {
+    server 127.0.0.1:3000;
+    keepalive 32;
+}
+
+# ---------- plain :80 — redirect to https ----------
+server {
+    listen 80;
+    listen [::]:80;
+    server_name wallet.example.com;
+    # ACME / Let's Encrypt webroot challenge (certbot)
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ---------- production :443 with TLS ----------
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name wallet.example.com;
+
+    # ---- TLS ----
+    ssl_certificate     /etc/letsencrypt/live/wallet.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/wallet.example.com/privkey.pem;
+
+    # Mozilla "Intermediate" profile (May 2026 baseline) — TLS 1.2 + 1.3 only.
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # OCSP stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 1.1.1.1 1.0.0.1 valid=300s;
+    resolver_timeout 5s;
+
+    # ---- HSTS ----
+    # Start with includeSubDomains; add `preload` only after >6 months of
+    # successful HTTPS + you're ready to commit (preload list removal is slow).
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # ---- baseline security headers ----
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    # Helmet in the API also sets CSP for API responses; the SPA's CSP belongs
+    # on /index.html only and can be added here if/when finalised.
+
+    root /var/www/wallet;
+    index index.html;
+
+    client_max_body_size 25m;
+    client_body_timeout 30s;
+    client_header_timeout 15s;
+    send_timeout 60s;
+
+    limit_conn wallet_conn 32;
+
+    # ---- SPA assets ----
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    # ---- API endpoints ----
+    location /api/ {
+        # Strict per-IP burst — Express express-rate-limit handles per-user
+        # limits already; this is a coarse pre-filter.
+        limit_req zone=wallet_api burst=60 nodelay;
+        proxy_pass http://wallet_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ---- Auth endpoints get a tighter limit ----
+    location ~* ^/api/auth/(login|signup|password|mfa) {
+        limit_req zone=wallet_auth burst=20 nodelay;
+        proxy_pass http://wallet_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ---- Public merchant API (HMAC) — raw body required ----
+    location /merchant-api/ {
+        limit_req zone=wallet_merch burst=40 nodelay;
+        proxy_pass http://wallet_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_request_buffering off;
+    }
+
+    # ---- Inbound provider webhooks ----
+    location /webhooks/ {
+        limit_req zone=wallet_merch burst=40 nodelay;
+        proxy_pass http://wallet_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_request_buffering off;
+    }
+
+    # ---- Storage downloads (HMAC-signed URLs) ----
+    location /storage/ {
+        proxy_pass http://wallet_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Cache signed URL fetches briefly so range requests don't re-trigger
+        # the HMAC verify path; tighten to 0 if you prefer.
+        proxy_buffering on;
+    }
+
+    # ---- Socket.IO realtime ----
+    location /ws {
+        proxy_pass http://wallet_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;
+    }
+}
