@@ -4,6 +4,19 @@ import {
   pickHighestEligibleTier,
   type TierThreshold,
 } from "../services/loyalty-tier.service";
+import {
+  computeCooldownFactor,
+  computeSpendPoints,
+  computeStreakFactor,
+  computeTurnoverFactor,
+  isInCooldown,
+  WITHDRAW_COOLDOWN_THRESHOLD,
+} from "../services/loyalty-scoring.service";
+import {
+  computePoolAmount,
+  computeProfitShareNetProfit,
+  distributeProRataAllocations,
+} from "../services/admin/profit-share.service";
 
 /** Seed-aligned 18 barem thresholds (LOYALTY_TIERS — L6). */
 const SEED_TIERS: TierThreshold[] = [
@@ -70,5 +83,133 @@ describe("L2 — tier eligibility (points AND turnover)", () => {
   it("picks the highest tier when both stats exceed multiple thresholds", () => {
     expect(pickHighestEligibleTier(SEED_TIERS, 30_000, 2_500_000).id).toBe(12);
     expect(pickHighestEligibleTier(SEED_TIERS, 600_000, 60_000_000).id).toBe(18);
+  });
+});
+
+describe("L1 Faz 2 — LOYALTY_V3 spend scoring", () => {
+  it("turnover_factor uses log2(min(count,32)+1) capped growth", () => {
+    expect(computeTurnoverFactor(0)).toBeCloseTo(1);
+    expect(computeTurnoverFactor(1)).toBeCloseTo(2);
+    expect(computeTurnoverFactor(31)).toBeCloseTo(1 + Math.log2(32));
+    expect(computeTurnoverFactor(100)).toBeCloseTo(1 + Math.log2(33));
+  });
+
+  it("streak_factor caps at 1.5×", () => {
+    expect(computeStreakFactor(0)).toBe(1);
+    expect(computeStreakFactor(4)).toBeCloseTo(1.2);
+    expect(computeStreakFactor(10)).toBe(1.5);
+    expect(computeStreakFactor(30)).toBe(1.5);
+  });
+
+  it("cooldown_factor halves multiplier", () => {
+    expect(computeCooldownFactor(false)).toBe(1);
+    expect(computeCooldownFactor(true)).toBe(0.5);
+  });
+
+  it("isInCooldown respects cooldown_until timestamp", () => {
+    const future = new Date(Date.now() + 60_000).toISOString();
+    const past = new Date(Date.now() - 60_000).toISOString();
+    expect(isInCooldown(future)).toBe(true);
+    expect(isInCooldown(past)).toBe(false);
+    expect(isInCooldown(null)).toBe(false);
+  });
+
+  it("computeSpendPoints applies full formula on ₺10 blocks", () => {
+    // ₺100 → base 10; rookie 1.0×, no streak/cooldown, first monthly spend (+1 in factor)
+    expect(
+      computeSpendPoints({
+        amount: 100,
+        tierMultiplier: 1,
+        monthlySpendCount: 0,
+        streakDays: 0,
+        inCooldown: false,
+      }),
+    ).toBe(10);
+
+    // ₺25 → base 2; turnover only (2nd spend this month)
+    expect(
+      computeSpendPoints({
+        amount: 25,
+        tierMultiplier: 1,
+        monthlySpendCount: 1,
+        streakDays: 0,
+        inCooldown: false,
+      }),
+    ).toBe(Math.floor(2 * computeTurnoverFactor(1)));
+
+    // cooldown halves output
+    expect(
+      computeSpendPoints({
+        amount: 100,
+        tierMultiplier: 2,
+        monthlySpendCount: 0,
+        streakDays: 4,
+        inCooldown: true,
+      }),
+    ).toBe(
+      Math.floor(
+        10 *
+          computeTurnoverFactor(0) *
+          computeStreakFactor(4) *
+          2 *
+          computeCooldownFactor(true),
+      ),
+    );
+  });
+
+  it("documents withdraw cooldown threshold", () => {
+    expect(WITHDRAW_COOLDOWN_THRESHOLD).toBe(3);
+  });
+});
+
+describe("PS1 — profit share net profit + carry-forward", () => {
+  it("subtracts platform cost, affiliate cost, and carried overhead", () => {
+    expect(
+      computeProfitShareNetProfit({
+        platformRevenue: 10_000,
+        platformCost: 2_000,
+        affiliateCost: 500,
+        carriedOverhead: 1_500,
+      }),
+    ).toBe(6_000);
+  });
+
+  it("floors net profit at zero", () => {
+    expect(
+      computeProfitShareNetProfit({
+        platformRevenue: 100,
+        platformCost: 50,
+        affiliateCost: 30,
+        carriedOverhead: 200,
+      }),
+    ).toBe(0);
+  });
+
+  it("computePoolAmount rounds to 2 decimal places", () => {
+    expect(computePoolAmount(1_234.567, 33.33)).toBe(411.48);
+    expect(computePoolAmount(0, 50)).toBe(0);
+  });
+});
+
+describe("PS10 — profit share pool remainder distribution", () => {
+  it("allocations sum exactly to pool amount", () => {
+    const pool = 100;
+    const turnovers = [50, 30, 20];
+    const amounts = distributeProRataAllocations(turnovers, pool);
+    expect(amounts.reduce((s, a) => s + a, 0)).toBeCloseTo(pool, 2);
+    expect(amounts[0]).toBeGreaterThanOrEqual(amounts[1]!);
+    expect(amounts[1]).toBeGreaterThanOrEqual(amounts[2]!);
+  });
+
+  it("gives remainder cents to top recipients first", () => {
+    const pool = 1;
+    const amounts = distributeProRataAllocations([1, 1, 1], pool);
+    expect(amounts).toEqual([0.34, 0.33, 0.33]);
+    expect(amounts.reduce((s, a) => s + a, 0)).toBe(1);
+  });
+
+  it("returns zeros for empty or zero pool", () => {
+    expect(distributeProRataAllocations([], 100)).toEqual([]);
+    expect(distributeProRataAllocations([10, 20], 0)).toEqual([0, 0]);
   });
 });

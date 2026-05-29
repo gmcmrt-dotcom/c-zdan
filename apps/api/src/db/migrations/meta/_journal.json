@@ -127,6 +127,20 @@
       "when": 1779785000000,
       "tag": "0017_loyalty_barems",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1779790000000,
+      "tag": "0018_profit_share_overhead",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1779795000000,
+      "tag": "0019_profit_share_close",
+      "breakpoints": true
     }
   ]
 }

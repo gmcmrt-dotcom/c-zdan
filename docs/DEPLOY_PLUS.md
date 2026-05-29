@@ -10,14 +10,14 @@
 
 ## Ne yapar?
 
-`+` komutu (veya `npm run deploy`) yerel geliştirmeyi production sunucusuna gönderir:
+`+` komutu (veya `npm run deploy`) yerel geliştirmeyi **önce GitHub'a**, ardından production sunucusuna gönderir:
 
 1. **Ön kontrol (yerel)** — `typecheck` zorunlu; `lint` varsayılan açık; `test:seed:verify` isteğe bağlı
-2. **Git durumu** — commit edilmemiş dosya varsa uyarır
-3. **Gönderim** — `git` modu: push + sunucuda pull; `rsync` modu: çalışma ağacını doğrudan senkronize eder
+2. **GitHub senkronizasyonu** — değişiklik varsa otomatik commit; remote'un gerisindeyse push (`origin`/aktif dal)
+3. **Gönderim** — `git` modu: sunucuda pull; `rsync` modu: çalışma ağacını doğrudan senkronize eder
 4. **Sunucu** — `npm install` → `db:migrate` → `build` → `systemctl restart wallet-api` → `nginx reload` → `/health` doğrulama
 
-**Güvenlik:** `typecheck` başarısızsa deploy **asla** çalışmaz. `deploy.config.json` yoksa script Türkçe kurulum talimatı verip durur.
+**Güvenlik:** `typecheck` başarısızsa deploy **asla** çalışmaz. `deploy.config.json` ve `.env` dosyaları commit edilmez (`.gitignore` + script denylist). `deploy.config.json` yoksa script Türkçe kurulum talimatı verip durur.
 
 ---
 
@@ -95,7 +95,7 @@ cp deploy.config.example.json deploy.config.json
 | `path` | Sunucudaki repo kökü (`/opt/wallet`) |
 | `sshKey` | Yerel özel anahtar yolu |
 | `deployMethod` | `"git"` (varsayılan) veya `"rsync"` |
-| `gitRemote` / `gitBranch` | Push/pull hedefi |
+| `gitRemote` / `gitBranch` | GitHub push/pull hedefi (varsayılan `origin` / `main`; push aktif daldan yapılır) |
 | `remoteRunUser` | Sunucuda `npm`/`git` çalıştıran kullanıcı |
 | `webStaticPath` | Opsiyonel — `DEPLOY_WORKFLOW` §4'teki `/var/www/wallet/` yolu; Rocky installer nginx'i repo içinden servis ediyorsa `null` bırakın |
 | `preflight.seedVerify` | `true` yaparsanız deploy öncesi `npm run test:seed:verify` koşar (yalnızca temiz local DB'de anlamlı) |
@@ -122,6 +122,9 @@ sudo -u wallet git -C /opt/wallet remote -v
 ```bash
 npm run deploy              # interaktif onay sorar
 npm run deploy -- --yes     # onayı atla
+npm run deploy -- --message "feat: yeni ödeme akışı"   # özel commit mesajı
+npm run deploy -- --no-push # yalnızca sunucu deploy, GitHub atlanır
+npm run deploy -- --dry-run # commit/push önizlemesi, deploy yok
 DEPLOY_CONFIRM=1 npm run deploy
 ```
 
@@ -136,10 +139,10 @@ Sohbette tam olarak şunlardan biri yazıldığında agent deploy akışını ba
 Agent davranışı (`.cursor/rules/deploy-plus.mdc`):
 
 1. `deploy.config.json` var mı kontrol et — yoksa kurulum adımlarını göster
-2. Kullanıcıya kısa özet sun (git durumu, hedef sunucu)
+2. Kullanıcıya kısa özet sun (git durumu, hedef sunucu, GitHub remote)
 3. **Onay iste** — kullanıcı onaylamadan `npm run deploy` çalıştırma
-4. Onay sonrası `npm run deploy -- --yes` veya interaktif `npm run deploy`
-5. Çıktıyı özetle; hata varsa kök nedeni raporla
+4. Onay sonrası `npm run deploy -- --yes` (script önce GitHub commit+push, sonra sunucu deploy yapar)
+5. Çıktıyı özetle (GitHub + sunucu); hata varsa kök nedeni raporla
 
 ---
 
@@ -153,24 +156,28 @@ Agent davranışı (`.cursor/rules/deploy-plus.mdc`):
 │  2. npm run typecheck          ← ZORUNLU, başarısız = DUR   │
 │  3. npm run lint               ← varsayılan açık            │
 │  4. npm run test:seed:verify    ← config ile opsiyonel      │
-│  5. git status uyarları                                     │
+│  5. git status özeti + dal uyarıları                        │
 │  6. Kullanıcı onayı (--yes veya DEPLOY_CONFIRM=1 ile atla) │
-│  7a. git push origin main       (deployMethod=git)          │
-│  7b. rsync → sunucu             (deployMethod=rsync)        │
+│  7. GitHub (--no-push ile atlanabilir):                     │
+│     a. Değişiklik varsa → git add . + commit (timestamp     │
+│        veya --message)                                      │
+│     b. Remote gerideyse → git push origin/<aktif dal>       │
+│     c. Güncelse → push atlanır                              │
+│  8. rsync → sunucu              (deployMethod=rsync)        │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼ SSH
 ┌─────────────────────────────────────────────────────────────┐
 │  SUNUCU (/opt/wallet)                                       │
 ├─────────────────────────────────────────────────────────────┤
-│  8.  git pull --ff-only          (git modunda)              │
-│  9.  npm install --no-audit --no-fund                       │
-│  10. npm run db:migrate                                     │
-│  11. npm run build                                          │
-│  12. sudo systemctl restart wallet-api                      │
-│  13. rsync web/dist → webStaticPath  (yapılandırıldıysa)   │
-│  14. sudo nginx -t && sudo systemctl reload nginx           │
-│  15. curl http://127.0.0.1:3000/health                      │
+│  9.  git pull --ff-only          (git modunda)              │
+│  10. npm install --no-audit --no-fund                       │
+│  11. npm run db:migrate                                     │
+│  12. npm run build                                          │
+│  13. sudo systemctl restart wallet-api                      │
+│  14. rsync web/dist → webStaticPath  (yapılandırıldıysa)   │
+│  15. sudo nginx -t && sudo systemctl reload nginx           │
+│  16. curl http://127.0.0.1:3000/health                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -180,10 +187,10 @@ Agent davranışı (`.cursor/rules/deploy-plus.mdc`):
 
 | | **git** (önerilen) | **rsync** |
 |---|-------------------|-----------|
-| Ne zaman | Commit'lenmiş, push edilmiş kod | Hızlı test; commit etmeden deneme |
-| Yerel | `git push` | `rsync` ile dosya kopyası |
+| Ne zaman | Commit'lenmiş, push edilmiş kod | Hızlı test; `--no-push` ile GitHub atlanabilir |
+| Yerel | Otomatik commit + `git push` (varsayılan) | Aynı GitHub adımı + `rsync` ile dosya kopyası |
 | Sunucu | `git pull --ff-only` | Pull yok — dosyalar zaten güncel |
-| Risk | Düşük — izlenebilir commit | Orta — commit dışı dosya gidebilir |
+| Risk | Düşük — izlenebilir commit | Orta — `--no-push` ile commit dışı dosya gidebilir |
 
 **Öneri:** Production için her zaman `git` modu; `rsync` yalnızca staging veya acil hotfix için.
 
@@ -213,6 +220,7 @@ Otomatik down-migration yok (`docs/DEPLOY_WORKFLOW.md` § 8).
 | `SSH anahtarı bulunamadı` | `sshKey` yolunu düzeltin veya `ssh-keygen` |
 | `Permission denied (publickey)` | `ssh-copy-id` tekrarlayın |
 | `typecheck` fail | Deploy durur — önce TS hatalarını düzeltin |
+| `GitHub push başarısız` | `git remote -v`, `ssh -T git@github.com` veya `gh auth login` |
 | `git pull --ff-only` fail | Sunucuda manuel merge gerekebilir; önce `git status` |
 | API 502 | `sudo journalctl -u wallet-api -n 100` |
 | Migration hata | `apps/api/.env` içindeki `DATABASE_URL` doğru mu? |

@@ -36,9 +36,12 @@ import { makeTxPublicNo } from "../lib/public-no";
 import { randomNumericCode } from "../lib/random";
 import { computeFee } from "../lib/fees";
 import { maybeUpgradeTier } from "./loyalty-tier.service";
+import {
+  computeSpendPoints,
+  loadLoyaltySpendContext,
+} from "./loyalty-scoring.service";
 
 const CODE_LEN = 8;
-const POINT_PER_LIRA = 1;
 
 function newCode(): string {
   return randomNumericCode(CODE_LEN);
@@ -91,18 +94,24 @@ export async function previewSpend(userId: string, amount: number) {
   const available = Number(acc.balance) - Number(acc.reserved);
   if (amount > available) throw new UnprocessableError("INSUFFICIENT_FUNDS");
   const tier = await getOrLoadTier(userId);
-  const reservedPoints = Math.floor(amount * POINT_PER_LIRA * tier.pointMultiplier);
-  return {
+  const loyaltyCtx = await loadLoyaltySpendContext(userId);
+  const spendPoints = computeSpendPoints({
     amount,
-    fee: 0,
-    reservedPoints,
-    newBalance: Number(acc.balance) - amount,
-    tierSnapshot: {
-      id: tier.id,
-      displayName: tier.displayName,
-      pointMultiplier: tier.pointMultiplier,
+    tierMultiplier: tier.pointMultiplier,
+    monthlySpendCount: loyaltyCtx.monthlySpendCount,
+    streakDays: loyaltyCtx.streakDays,
+    inCooldown: loyaltyCtx.inCooldown,
+  });
+  // Legacy RPC shape — Payment.tsx reads data[0].
+  return [
+    {
+      spend_points: spendPoints,
+      cashback_points: 0,
+      cashback_amount: 0,
+      tier_label: tier.displayName,
+      turnover: loyaltyCtx.monthlySpendCount,
     },
-  };
+  ];
 }
 
 export async function createPaymentCode(
@@ -135,12 +144,20 @@ export async function createPaymentCode(
       reserved_balance: string;
       tier_id: number;
       total_points: number;
+      cooldown_until: string | null;
     }>(sql`
-      SELECT balance, reserved_balance, current_tier_id AS tier_id, total_points
+      SELECT balance, reserved_balance, current_tier_id AS tier_id, total_points,
+             cooldown_until
       FROM accounts WHERE user_id = ${userId} FOR UPDATE
     `);
     const row = acc as unknown as
-      | { balance: string; reserved_balance: string; tier_id: number; total_points: number }
+      | {
+          balance: string;
+          reserved_balance: string;
+          tier_id: number;
+          total_points: number;
+          cooldown_until: string | null;
+        }
       | undefined;
     if (!row) throw new NotFoundError("ACCOUNT_NOT_FOUND");
     const balance = Number(row.balance);
@@ -151,7 +168,17 @@ export async function createPaymentCode(
     // H6 — pass the open transaction so the tier read is part of the same
     // serialised view as the locked-account row above.
     const tier = await getOrLoadTier(userId, trx);
-    const reservedPoints = Math.floor(amount * POINT_PER_LIRA * tier.pointMultiplier);
+    const loyaltyCtx = await loadLoyaltySpendContext(userId, {
+      cooldownUntil: row.cooldown_until,
+      trx,
+    });
+    const reservedPoints = computeSpendPoints({
+      amount,
+      tierMultiplier: tier.pointMultiplier,
+      monthlySpendCount: loyaltyCtx.monthlySpendCount,
+      streakDays: loyaltyCtx.streakDays,
+      inCooldown: loyaltyCtx.inCooldown,
+    });
 
     // Allocate a unique code (retry on collision)
     let code = "";

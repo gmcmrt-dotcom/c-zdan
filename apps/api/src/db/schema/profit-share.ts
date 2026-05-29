@@ -24,6 +24,7 @@ export const profitShareCampaigns = pgTable(
     platformRevenue: numeric("platform_revenue", { precision: 14, scale: 2 }).notNull(),
     platformCost: numeric("platform_cost", { precision: 14, scale: 2 }).notNull(),
     affiliateCost: numeric("affiliate_cost", { precision: 14, scale: 2 }).notNull().default("0"),
+    carriedOverhead: numeric("carried_overhead", { precision: 14, scale: 2 }).notNull().default("0"),
     netProfit: numeric("net_profit", { precision: 14, scale: 2 }).notNull(),
     poolAmount: numeric("pool_amount", { precision: 14, scale: 2 }).notNull(),
     topTurnoverTotal: numeric("top_turnover_total", { precision: 14, scale: 2 })
@@ -39,6 +40,8 @@ export const profitShareCampaigns = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     cancelledBy: uuid("cancelled_by").references(() => users.id, { onDelete: "set null" }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    closedBy: uuid("closed_by").references(() => users.id, { onDelete: "set null" }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

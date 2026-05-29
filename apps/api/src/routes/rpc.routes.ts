@@ -804,6 +804,18 @@ const handlers: Record<string, RpcHandler> = {
       campaignId: String(arg(a, "_campaign_id")),
       ip: clientIp(req),
     }),
+  admin_close_profit_share_campaign: async (req, a) =>
+    profitShare.closeCampaign({
+      actorId: user(req).id,
+      campaignId: String(arg(a, "_campaign_id")),
+      ip: clientIp(req),
+    }),
+  admin_cancel_profit_share_campaign: async (req, a) =>
+    profitShare.cancelCampaign({
+      actorId: user(req).id,
+      campaignId: String(arg(a, "_campaign_id")),
+      ip: clientIp(req),
+    }),
 
   // ---------- merchant BO ----------
   merchant_self: async (req) => {
@@ -889,6 +901,8 @@ const adminRpcPerms: Record<string, { resource: string; action: string }> = {
   admin_preview_profit_share: { resource: "profit_share", action: "view" },
   admin_create_profit_share_campaign: { resource: "profit_share", action: "manage" },
   admin_publish_profit_share_campaign: { resource: "profit_share", action: "manage" },
+  admin_close_profit_share_campaign: { resource: "profit_share", action: "manage" },
+  admin_cancel_profit_share_campaign: { resource: "profit_share", action: "manage" },
   // admin_create_method_type / admin_create_*_template / admin_create_chat_canned
   // already check req.perms inline; we still require staff role here.
   admin_create_method_type: { resource: "method_types", action: "manage" },

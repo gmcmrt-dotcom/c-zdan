@@ -77,6 +77,12 @@ const EnvSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  // PS5 — optional push stub for profit-share publish notifications.
+  PUSH_NOTIFICATIONS_ENABLED: z
+    .union([z.literal("true"), z.literal("false")])
+    .default("false")
+    .transform((v) => v === "true"),
+
   // P0-18 — Disable referral payouts until anti-farming workers ship.
   // Today scan_referral_farming / scan_round_trip_farming are noops and the
   // qualify/reward pipeline is unimplemented; this flag is a hard gate so an

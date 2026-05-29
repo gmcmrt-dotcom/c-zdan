@@ -57,7 +57,7 @@ Sıra — onaylı iş kararlarına göre (`docs/BUSINESS_DECISIONS.md` uygulama 
 Kaynak: profit share inceleme (2026-05). Sayfa kontratı → `docs/PAGE_CONTRACTS.md` § `/admin/profit-share`.  
 **İş kararları (onaylı 2026-05-29):** `docs/BUSINESS_DECISIONS.md` § PS1–PS6.
 
-**Durum:** PS1–PS6 **onaylandı** — teknik uygulama (PS7–PS13) sıraya alınabilir. PS1 carry-forward overhead yeni şema/ayar gerektirir.
+**Durum:** PS1–PS13 **tamamlandı** (2026-05-29). Tek kaynak spek: `docs/PROFIT_SHARE.md`.
 
 ### İş kararı — onaylandı ✅ (PS1–PS6)
 
@@ -68,18 +68,19 @@ Kaynak: profit share inceleme (2026-05). Sayfa kontratı → `docs/PAGE_CONTRACT
 - [x] **PS5** Yayın sonrası iletişim — **e-posta + uygulama içi** (+ isteğe bağlı push). → [BUSINESS_DECISIONS § PS5](BUSINESS_DECISIONS.md#ps5--yayın-sonrası-bildirim)
 - [x] **PS6** Kapanış — **özet + muhasebe onayı denetim izi** (kim, ne zaman). → [BUSINESS_DECISIONS § PS6](BUSINESS_DECISIONS.md#ps6--kampanya-kapanışı)
 
-### Teknik boşluklar (PS7–PS13)
+### Teknik uygulama (PS7–PS13) ✅
 
-- [ ] **PS7** `platform_cost=0` / `affiliate_cost=0` stub düzelt — ne: `computePreview` gerçek maliyet kaynaklarına bağlansın; neden: net kâr ve havuz şişiyor; etki: dağıtım tutarları iş kararından bağımsız yanlış hesaplanır (bkz. Q23 / `UYGULANAN_DEGISIKLIKLER.md`).
-- [ ] **PS8** Önizleme API ↔ Admin UI shape — ne: `summary` / `allocations` response sözleşmesi ile `ProfitShare.tsx` beklentisi hizalansın; neden: önizleme ekranı eksik veya kırık alan gösterebilir; etki: admin kampanya oluşturma güvenilirliği.
-- [ ] **PS9** Üye API ↔ FE DTO uyumu — ne: snake_case API yanıtı ile camelCase FE tipleri tek katmanda map'lensin; neden: sessiz alan kaybı / render hatası; etki: `/profit-share` üye yüzü.
-- [ ] **PS10** Yuvarlama / havuz artığı (Q23) — ne: pay oranı × havuz sonrası kuruş artığı politikası (en büyük paya ekle vs treasury'de bırak); neden: toplam allocation ≠ pool_amount; etki: muhasebe kapanışı ve son kuruş farkı.
-- [ ] **PS11** Kampanya cancel / close RPC + UI — ne: `cancelled` / `closed` geçişleri için admin endpoint ve buton; neden: yalnızca draft→published var, geri alma yok; etki: hatalı yayın veya dönem sonu operasyonu.
-- [ ] **PS12** Dedicated `PROFIT_SHARE.md` — ne: net kâr formülü, durum makinesi, claim akışı, cron, RBAC tek spek dosyası; neden: bilgi `PAGE_CONTRACTS` + kodda dağınık; etki: onboarding ve L4 çapraz referans.
-- [ ] **PS13** Playwright profit-share E2E — ne: admin draft→publish + üye claim + expired senaryosu; neden: smoke dışında UI regresyonu yok; etki: `e2e/` suite'e kampanya akışı eklenir.
+- [x] **PS7** `platform_cost=0` / `affiliate_cost=0` stub düzelt — `computePreview` gerçek maliyet kaynaklarına bağlandı (2026-05-29, PS1 ile birlikte).
+- [x] **PS8** Önizleme API ↔ Admin UI — `{ summary, allocations }` + `carried_overhead` gösterimi (2026-05-29).
+- [x] **PS9** Üye API ↔ FE DTO — camelCase `ProfitShareReward` (`member.service` + shared DTO) (2026-05-29).
+- [x] **PS10** Yuvarlama / havuz artığı — `distributeProRataAllocations`, kuruş artığı rank sırasıyla (2026-05-29).
+- [x] **PS11** Kampanya cancel / close RPC + UI — `admin_cancel_*`, `admin_close_*` + butonlar (2026-05-29).
+- [x] **PS12** `PROFIT_SHARE.md` — net kâr, durum makinesi, claim, cron, RBAC tek spek (2026-05-29).
+- [x] **PS13** Playwright E2E — `e2e/admin/profit-share.spec.ts`, `e2e/member/profit-share.spec.ts` (2026-05-29).
 
 ### Referans
 
+- **Spek (tek kaynak)** → `docs/PROFIT_SHARE.md`
 - **İş kararları** → `docs/BUSINESS_DECISIONS.md`
 - Sayfa kontratı → `docs/PAGE_CONTRACTS.md` § `/admin/profit-share`
 - Servis → `apps/api/src/services/admin/profit-share.service.ts`
@@ -109,11 +110,11 @@ Kaynak: `docs/UYGULANAN_DEGISIKLIKLER.md` § Hâlâ Bekleyen Maddeler.
 
 ### Tamamlanan
 
-- [x] `scripts/deploy-plus.mjs` — ön kontrol, git/rsync, uzak build + restart
+- [x] `scripts/deploy-plus.mjs` — ön kontrol, GitHub commit+push, git/rsync, uzak build + restart
 - [x] `deploy.config.example.json` + `.gitignore` (`deploy.config.json`)
 - [x] `docs/DEPLOY_PLUS.md` — tek seferlik kurulum + günlük kullanım
 - [x] `.cursor/rules/deploy-plus.mdc` — agent `+` / `deploy` / `sunucuya gönder` davranışı
-- [x] `npm run deploy` / `npm run deploy:plus`
+- [x] `npm run deploy` / `npm run deploy:plus` — `--message`, `--no-push`, `--dry-run` bayrakları
 
 ### Sıradaki (opsiyonel)
 

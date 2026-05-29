@@ -193,3 +193,30 @@ export function newDeviceLoginTemplate(vars: NewDeviceLoginEmailVars) {
     `),
   };
 }
+
+export interface ProfitSharePublishedEmailVars {
+  name?: string | null;
+  amount: string;
+  expiresAt: string;
+  claimUrl: string;
+}
+export function profitSharePublishedTemplate(vars: ProfitSharePublishedEmailVars) {
+  const greeting = vars.name ? `Merhaba ${vars.name},` : "Merhaba,";
+  return {
+    subject: `${PRODUCT_NAME} — kazanç payın hazır`,
+    html: wrap(`
+      <p>${greeting}</p>
+      <p>Kazanç dağıtımı kapsamında sana özel <b>${vars.amount}</b> kazanç payı tanımlandı.</p>
+      <p>Son kullanım zamanı: <b>${vars.expiresAt}</b></p>
+      <p><a href="${vars.claimUrl}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:8px">Kazanç payını al</a></p>
+      <p style="color:#666;font-size:13px">Süre içinde işlem yapılmazsa bu kazanç payı otomatik iptal edilir.</p>
+    `),
+    text: [
+      greeting,
+      "",
+      `Kazanç payın hazır: ${vars.amount}`,
+      `Son kullanım: ${vars.expiresAt}`,
+      `Almak için: ${vars.claimUrl}`,
+    ].join("\n"),
+  };
+}

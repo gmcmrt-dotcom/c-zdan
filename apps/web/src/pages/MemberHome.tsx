@@ -1,3 +1,4 @@
+import type { ProfitShareReward } from "@wallet/shared/dto/member";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -26,7 +27,7 @@ export default function MemberHome() {
   const [recent, setRecent] = useState<Array<{ id: string; type: string; amount: number; created_at: string; public_no: string | null }>>([]);
   const [pointsMap, setPointsMap] = useState<Map<string, number>>(new Map());
   const [pendingTopup, setPendingTopup] = useState<{ session_id: string; status: string; amount: number; expires_at: string } | null>(null);
-  const [pendingProfitShare, setPendingProfitShare] = useState<{ allocation_id: string; allocated_amount: number; period_from: string; period_to: string } | null>(null);
+  const [pendingProfitShare, setPendingProfitShare] = useState<Pick<ProfitShareReward, "id" | "allocatedAmount" | "campaign"> | null>(null);
   const [, setTick] = useState(0);
   const devMockEnabled = import.meta.env.VITE_DEV_MOCK_MERCHANT === "true";
 
@@ -62,13 +63,12 @@ export default function MemberHome() {
       const row = pt?.[0];
       setPendingTopup(row ?? null);
 
-      const rewards = await rpc<Array<{ allocation_id: string; allocated_amount: number; period_from: string; period_to: string; status: string }>>("my_profit_share_rewards").catch(() => []);
+      const rewards = await rpc<ProfitShareReward[]>("my_profit_share_rewards").catch(() => []);
       const pendingReward = (rewards ?? []).find((r) => r.status === "pending");
       setPendingProfitShare(pendingReward ? {
-        allocation_id: pendingReward.allocation_id,
-        allocated_amount: Number(pendingReward.allocated_amount),
-        period_from: pendingReward.period_from,
-        period_to: pendingReward.period_to,
+        id: pendingReward.id,
+        allocatedAmount: Number(pendingReward.allocatedAmount),
+        campaign: pendingReward.campaign,
       } : null);
     })();
   }, [user]);
@@ -197,7 +197,7 @@ export default function MemberHome() {
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold">{t("member.home.pendingProfitShareTitle")}</div>
               <div className="text-xs text-muted-foreground tabular-nums">
-                +{fmtTRY(pendingProfitShare.allocated_amount)} · {t("member.home.pendingProfitShareCta")}
+                +{fmtTRY(pendingProfitShare.allocatedAmount)} · {t("member.home.pendingProfitShareCta")}
               </div>
             </div>
             <ChevronRight className="size-4 text-muted-foreground shrink-0" />

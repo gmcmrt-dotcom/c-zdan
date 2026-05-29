@@ -42,6 +42,7 @@ import {
 import { allocPublicNo } from "../lib/public-no";
 import { writeCashPoolDelta } from "./cash-pool";
 import { applyWithdrawPenalty } from "./member.service";
+import { maybeSetWithdrawCooldown } from "./loyalty-scoring.service";
 import { writeProviderLedger } from "./provider-ledger.service";
 import { computeFee } from "../lib/fees";
 
@@ -406,6 +407,9 @@ export async function finalizeWithdrawCallback(
       withdrawAmount: Number(s.amount),
       transactionId: txn.id,
     });
+
+    // L1 Faz 2 — ≥3 withdraw in 30d → 50% spend multiplier for next 30 days.
+    await maybeSetWithdrawCooldown(trx, s.user_id);
 
     // P0-16 / P0-34 — cash_pool already deducted + logged at routing time.
     const feeNum = Number(s.fee);

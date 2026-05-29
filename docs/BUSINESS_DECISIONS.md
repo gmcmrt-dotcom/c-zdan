@@ -31,23 +31,22 @@
 
 ## PS1 — Net kâr ve carry-forward genel gider
 
+> **Uygulama speği:** `docs/PROFIT_SHARE.md` § 2
+
 ### Karar (tam metin)
 
 **Gelir = tüm gelirler − tüm giderler.** Sisteme kalan net tutar.
 
 **IMPORTANT:** Her dağıtımdaki toplam tutarı şirketin genel giderine ekleyip bir sonraki dağıtımdaki net kârı buna göre hesapla (carry-forward overhead between campaigns).
 
-### Teknik notlar (uygulama öncesi)
+### Teknik notlar (uygulandı — 2026-05-29)
 
-| Konu | Mevcut durum | Gereken |
-|------|--------------|---------|
-| Net kâr formülü | `profit-share.service.ts` → `computePreview` — `platform_cost` stub (0) | Gerçek gelir/gider kaynaklarına bağlan (PS7) |
-| Carry-forward | Yok | Yeni alan veya ayar tablosu gerekir |
-| Olası şema | `profit_share_campaigns` snapshot alanları | `carried_overhead` (önceki kampanyalardan biriken dağıtım toplamı) veya `settings` singleton (`profit_share_cumulative_overhead`) |
-| Hesap akışı | `net_profit = revenue − costs − affiliate` | `net_profit = revenue − costs − affiliate − carried_overhead`; publish sonrası `pool_amount` → `carried_overhead`'e ekle |
-| Denetim | `writeAudit` mevcut | Kampanya publish/close'ta overhead delta audit satırı |
-
-**Bağımlılık:** PS7 (maliyet stub) PS1 ile birlikte veya hemen öncesinde çözülmeli; aksi halde carry-forward yanlış tabana oturur.
+| Konu | Durum |
+|------|-------|
+| Net kâr formülü | ✅ `fetchPlatformEconomics` + `computeProfitShareNetProfit` |
+| Carry-forward | ✅ `settings.profit_share_cumulative_overhead` + kampanya `carried_overhead` snapshot |
+| Publish overhead | ✅ `addCumulativeOverhead` + `profit_share.overhead_carry_forward` audit |
+| Migrasyon | `0018_profit_share_overhead` |
 
 ---
 
@@ -72,6 +71,8 @@ Admin BO'da `distribution_pct` girilir; girilen yüzde kadar dağıtılır. Mutl
 ---
 
 ## PS5 — Yayın sonrası bildirim
+
+> **Uygulama speği:** `docs/PROFIT_SHARE.md` § 6 · kod: `profit-share-notify.service.ts`
 
 | Kanal | Zorunluluk |
 |-------|------------|
@@ -217,6 +218,6 @@ Webhook'ta beklenen tutar ≠ sağlayıcı tutarı durumunda 500 dönmek yerine 
 | 7 | PS8–PS11 | Profit-share teknik boşluklar |
 | 8 | PS5 | Bildirim pipeline |
 | 9 | PS6 | Kapanış özeti + muhasebe onayı |
-| 10 | PS12–PS13 | Spek + E2E |
+| 10 | PS12–PS13 | Spek + E2E ✅ (2026-05-29) |
 | — | L3, L4, L5 | Politika — çoğu mevcut guard ile uyumlu; kod değişikliği minimal |
 | — | P0-32 | Ertelendi |

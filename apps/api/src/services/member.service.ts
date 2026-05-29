@@ -25,6 +25,11 @@ import {
 import { ConflictError, NotFoundError, UnprocessableError } from "../lib/errors";
 import { makeTxPublicNo } from "../lib/public-no";
 import { queryLifetimeSpendTurnover } from "./loyalty-tier.service";
+import {
+  isInCooldown,
+  queryMonthlySpendCount,
+  queryStreakDays,
+} from "./loyalty-scoring.service";
 
 // ---------- transactions ----------
 export interface ListTxParams {
@@ -140,50 +145,12 @@ export async function myLoyaltySummary(userId: string): Promise<LoyaltySummaryRo
   // Lifetime turnover = SUM of completed spend amounts (Akış A consumption).
   const lifetimeTurnover = await queryLifetimeSpendTurnover(userId);
 
-  // Monthly spend count = distinct spend transactions in the last 30 days.
-  const since30Iso = new Date(Date.now() - 30 * 86400_000).toISOString();
-  const [monthly] = await db.execute<{ n: string }>(sql`
-    SELECT count(*)::text AS n
-    FROM transactions
-    WHERE user_id = ${userId}
-      AND type = 'spend'
-      AND status = 'completed'
-      AND created_at >= ${since30Iso}::timestamptz
-  `);
-  const monthlySpendCount = Number(
-    (monthly as unknown as Array<{ n: string }>)[0]?.n ?? 0,
-  );
+  const [monthlySpendCount, streakDays] = await Promise.all([
+    queryMonthlySpendCount(userId),
+    queryStreakDays(userId),
+  ]);
 
-  // Streak days = consecutive UTC days (back from today) with at least one
-  // completed spend.  Cheap to compute on the fly while datasets are small.
-  const days = await db.execute<{ d: string }>(sql`
-    SELECT DISTINCT date_trunc('day', created_at AT TIME ZONE 'UTC')::date::text AS d
-    FROM transactions
-    WHERE user_id = ${userId} AND type = 'spend' AND status = 'completed'
-    ORDER BY d DESC
-    LIMIT 365
-  `);
-  const dayList = (days as unknown as Array<{ d: string }>).map((r) => r.d);
-  let streakDays = 0;
-  const today = new Date();
-  const toUtcYmd = (d: Date) => {
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-    const dd = String(d.getUTCDate()).padStart(2, "0");
-    return `${y}-${m}-${dd}`;
-  };
-  for (let i = 0; i < dayList.length; i++) {
-    const expected = new Date(today);
-    expected.setUTCDate(today.getUTCDate() - i);
-    if (dayList[i] === toUtcYmd(expected)) {
-      streakDays += 1;
-    } else {
-      break;
-    }
-  }
-
-  const inCooldown =
-    !!acc.cooldownUntil && new Date(acc.cooldownUntil).getTime() > Date.now();
+  const inCooldown = isInCooldown(acc.cooldownUntil);
 
   const row: LoyaltySummaryRow = {
     user_id: userId,
@@ -263,10 +230,14 @@ export async function myProfitShareRewards(userId: string) {
       id: profitShareAllocations.id,
       campaignId: profitShareAllocations.campaignId,
       rankNo: profitShareAllocations.rankNo,
+      turnoverAmount: profitShareAllocations.turnoverAmount,
+      sharePct: profitShareAllocations.sharePct,
       allocatedAmount: profitShareAllocations.allocatedAmount,
       status: profitShareAllocations.status,
       expiresAt: profitShareAllocations.expiresAt,
       claimedAt: profitShareAllocations.claimedAt,
+      expiredAt: profitShareAllocations.expiredAt,
+      claimTxPublicNo: transactions.publicNo,
       periodType: profitShareCampaigns.periodType,
       periodFrom: profitShareCampaigns.periodFrom,
       periodTo: profitShareCampaigns.periodTo,
@@ -276,8 +247,7 @@ export async function myProfitShareRewards(userId: string) {
       profitShareCampaigns,
       eq(profitShareAllocations.campaignId, profitShareCampaigns.id),
     )
-    // P0-24 — hide draft / archived / closed campaigns from members entirely;
-    // also keeps claim 404 ambiguous (no listing oracle on campaign state).
+    .leftJoin(transactions, eq(transactions.id, profitShareAllocations.claimTxId))
     .where(
       and(
         eq(profitShareAllocations.userId, userId),
@@ -290,10 +260,14 @@ export async function myProfitShareRewards(userId: string) {
     id: r.id,
     campaignId: r.campaignId,
     rankNo: r.rankNo,
+    turnoverAmount: Number(r.turnoverAmount),
+    sharePct: Number(r.sharePct),
     allocatedAmount: Number(r.allocatedAmount),
     status: r.status as "pending" | "claimed" | "expired",
     expiresAt: r.expiresAt.toISOString(),
     claimedAt: r.claimedAt?.toISOString() ?? null,
+    expiredAt: r.expiredAt?.toISOString() ?? null,
+    claimTxPublicNo: r.claimTxPublicNo ?? null,
     campaign: {
       periodType: r.periodType,
       periodFrom: r.periodFrom.toISOString(),

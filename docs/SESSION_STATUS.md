@@ -5,20 +5,22 @@
 > in git. Full audit roadmap (with per-finding citations) lives in
 > `.cursor/plans/wallet_production_go-live_audit_591d4884.plan.md`.
 
-**Last updated:** 2026-05-29 (L6 tier barems)
+**Last updated:** 2026-05-29 (PS12–PS13 profit share spek + E2E)
 
 ## Deploy "+" otomasyonu ✅ (2026-05-29)
 
-Tek komutla production deploy altyapısı eklendi:
+Tek komutla **GitHub + production** deploy altyapısı:
 
 | Dosya | Amaç |
 |-------|------|
-| `scripts/deploy-plus.mjs` | Deploy script |
-| `deploy.config.example.json` | Yapılandırma şablonu |
+| `scripts/deploy-plus.mjs` | Deploy script — otomatik commit+push + sunucu |
+| `deploy.config.example.json` | Yapılandırma şablonu (`gitRemote`/`gitBranch`) |
 | `docs/DEPLOY_PLUS.md` | Tam rehber (Türkçe) |
 | `.cursor/rules/deploy-plus.mdc` | Agent `+` davranışı |
 
 **Kullanım:** `cp deploy.config.example.json deploy.config.json` → sunucu bilgilerini doldur → sohbette `+` veya `npm run deploy`.
+
+**Bayraklar:** `--message`, `--no-push` (yalnızca sunucu), `--dry-run` (önizleme).
 
 **Not:** Gerçek sunucuya deploy yapılmadı — config olmadan script Türkçe talimat verip durur.
 
@@ -77,6 +79,10 @@ node scripts/verify-admin-perms.mjs   # exit 0 = admin BO OK
 
 | Batch | Headline | Mig |
 |-------|----------|-----|
+| **AG** | **PS12–PS13** profit share — `docs/PROFIT_SHARE.md` (iş+teknik spek); Playwright `e2e/admin/profit-share.spec.ts` + `e2e/member/profit-share.spec.ts`; INDEX / ROADMAP / BUSINESS_DECISIONS güncellendi. | — |
+| **AF** | **PS5–PS11** profit share — yayın bildirimi (email+in-app+push stub); kapanış özeti+audit (`closed_at`/`closed_by`); carried_overhead admin önizleme; üye DTO camelCase hizalama; pool remainder dağıtımı (PS10); cancel/close RPC+UI. | `0019_profit_share_close` |
+| **AE** | **PS1 + PS7** profit share — gerçek gelir/gider (`transactions` + `provider_ledger` + affiliate accrual); carry-forward `profit_share_cumulative_overhead` settings + kampanya `carried_overhead` snapshot; publish audit; önizleme API `{ summary, allocations }`. | `0018_profit_share_overhead` |
+| **AD** | **L1 Faz 2** LOYALTY_V3 spend formülü — `loyalty-scoring.service.ts` (turnover × streak × tier × cooldown); `payment-code.service` rezervasyon; withdraw ≥3/30g → `cooldown_until`; `my_loyalty_summary` paylaşımlı sorgular; unit testler. | — |
 | **AC** | **L6** 6×3 barem tier yapısı — 18 `loyalty_tiers` satırı; turnover ×20; `0017_loyalty_barems` (FK remap barem I); seed upsert; `pickHighestEligibleTier` sort_order; admin/member UI barem etiketleri. | `0017_loyalty_barems` |
 | **AB** | **L2** otomatik tier yükseltme (`maybeUpgradeTier` — puan **ve** turnover); spend + admin puan sonrası tetik; manuel düşürme `admin_set_member_tier` / `POST /api/admin/members/:id/tier` (`loyalty:manage`); `loyalty_points_log` + `writeAudit`. | — |
 | **AA** | **P0-21/P0-22** topup callback — geç `expired` session kabul; sağlayıcı tutarı source of truth (`amount_mismatch` audit metadata). **L1 Faz 1** withdraw penalty (`-floor(amount/10)×2`, `loyalty_points_log` idempotent). | — |
@@ -96,7 +102,7 @@ node scripts/verify-admin-perms.mjs   # exit 0 = admin BO OK
 | **A** Seed fixtures | ✅ | `npm run test:seed` → `scripts/seed-test-fixtures.mjs` |
 | **A′** Seed ledger verify | ✅ **0 critical / 0 error** (temiz DB) | `npm run test:seed:verify` — **smoke-all'dan önce** koş |
 | **B** Manuel checklist | **Done** | `docs/MANUAL_TEST_CHECKLIST.md` |
-| **C** Playwright E2E | ✅ **65/65** (tam suite) · Merchant BO alt kümesi **18/18** | `npm run test:e2e` → `e2e/merchant/*` |
+| **C** Playwright E2E | ✅ **69/69** (tam suite, PS13 +4 spec) · Merchant BO alt kümesi **18/18** | `npm run test:e2e` → `e2e/merchant/*` |
 | **D** API smoke | ✅ **216/220 pass** (tüm merchant BO REST yeşil) | `node scripts/smoke-all.mjs` — API restart sonrası |
 | **F** Pratik gap runner | ✅ **35/35** (local, temiz seed + withdraw tam döngü sonrası verify 0/0) | `node scripts/run-pratik-test-plan.mjs` |
 
@@ -126,18 +132,18 @@ node scripts/verify-admin-perms.mjs  # admin BO PERMISSION_DENIED yok mu?
 
 2. **Loyalty v3 — uygulama (L1–L6 onaylı)** — detay: `docs/ROADMAP.md` § Loyalty v3 · `docs/BUSINESS_DECISIONS.md` § L1–L6.
    - ~~**L1 Faz 1:** withdraw penalty~~ ✅ (2026-05-29) — `member.service` + `withdraw.service`.
+   - ~~**L1 Faz 2:** streak + cooldown + spend formülü~~ ✅ (2026-05-29) — `loyalty-scoring.service.ts` + `payment-code.service`.
    - ~~**L2:** otomatik tier yükseltme, manuel düşürme~~ ✅ (2026-05-29) — `loyalty-tier.service.ts`.
    - ~~**L6:** 6×3 barem seed + migration (turnover ×20)~~ ✅ (2026-05-29) — `0017_loyalty_barems.sql`.
-   - **L1 Faz 2:** streak + cooldown writer.
    - **L3/L4/L5:** politika onaylı; cashback kapalı, referral ödeme anti-farming'e kadar kapalı, profit share bağımsız.
    - **Kod/dok gap:** `commission_discount_pct` ücretlere uygulanmıyor; admin loyalty settings UI backend'e bağlı değil.
 
-3. **Kazanç Dağıtımı — teknik uygulama (PS1–PS6 onaylı)** — detay: `docs/ROADMAP.md` § Kazanç Dağıtımı · `docs/BUSINESS_DECISIONS.md` § PS1–PS6.
-   - **PS1 + PS7:** net kâr formülü (gelir − gider) + carry-forward overhead alanı (settings veya campaign field).
-   - **PS8–PS11:** maliyet stub, önizleme API/UI, üye DTO, yuvarlama, cancel/close RPC+UI.
-   - **PS5:** e-posta + in-app bildirim (+ opsiyonel push).
-   - **PS6:** kapanış özeti + muhasebe onayı audit.
-   - **PS12–PS13:** `PROFIT_SHARE.md` spek + Playwright E2E.
+3. ~~**Kazanç Dağıtımı — teknik uygulama (PS1–PS6 onaylı)**~~ ✅ (2026-05-29) — spek: `docs/PROFIT_SHARE.md` · PS1–PS13 tamam.
+   - ~~**PS1 + PS7** …~~ ✅
+   - ~~**PS8–PS11** …~~ ✅
+   - ~~**PS5** …~~ ✅
+   - ~~**PS6** …~~ ✅
+   - ~~**PS12–PS13** …~~ ✅ (2026-05-29) — `PROFIT_SHARE.md` + Playwright E2E.
 
 4. **P0-32** — 7 admin remediation RPC — **ertelendi** (onaylı defer).
 
@@ -148,6 +154,7 @@ node scripts/verify-admin-perms.mjs  # admin BO PERMISSION_DENIED yok mu?
 ## Reference
 
 - **Onaylı iş kararları** → `docs/BUSINESS_DECISIONS.md`
+- **Kazanç Dağıtımı spek** → `docs/PROFIT_SHARE.md`
 - Product roadmap → `docs/ROADMAP.md`
 - Audit plan → `.cursor/plans/wallet_production_go-live_audit_591d4884.plan.md`
 - DB schema → `apps/api/src/db/schema/*.ts`

@@ -296,6 +296,11 @@ async function seedReferralConfig() {
 async function seedSettings() {
   const defaults: Array<{ key: string; value: unknown; description: string }> = [
     { key: "affiliate_system_enabled", value: false, description: "Master switch for Akış F" },
+    {
+      key: "profit_share_cumulative_overhead",
+      value: 0,
+      description: "PS1 carry-forward: cumulative pool_amount from published profit-share campaigns",
+    },
     { key: "topup_session_ttl_seconds", value: 1200, description: "20 minutes" },
     { key: "withdraw_session_ttl_seconds", value: 1800, description: "30 minutes" },
     { key: "payment_code_default_ttl_seconds", value: 300, description: "5 minutes" },

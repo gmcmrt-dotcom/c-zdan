@@ -34,6 +34,8 @@ import {
   Send,
   Trophy,
   Users,
+  XCircle,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +51,7 @@ type PreviewSummary = {
   platform_revenue: number;
   platform_cost: number;
   affiliate_cost: number;
+  carried_overhead: number;
   net_profit: number;
   pool_amount: number;
   top_turnover_total: number;
@@ -92,6 +95,8 @@ type CampaignRow = {
   pending_amount: number;
   expired_count: number;
   expired_amount: number;
+  closed_at: string | null;
+  closed_by: string | null;
 };
 
 type AllocationRow = {
@@ -255,6 +260,15 @@ export default function AdminProfitShare() {
   const [previewing, setPreviewing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [closingId, setClosingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [closeSummary, setCloseSummary] = useState<{
+    campaignId: string;
+    claimed_amount: number;
+    pending_amount: number;
+    expired_amount: number;
+    closed_at: string;
+  } | null>(null);
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const [loadingAllocations, setLoadingAllocations] = useState(false);
 
@@ -355,6 +369,62 @@ export default function AdminProfitShare() {
       toast.error(translateError(err, "Yayınlanamadı"));
     } finally {
       setPublishingId(null);
+    }
+  };
+
+  const closeCampaign = async (campaignId: string) => {
+    if (!canManage) {
+      toast.error("Bu işlem için admin yetkisi gerekiyor");
+      return;
+    }
+    setClosingId(campaignId);
+    try {
+      const data = await rpc<{
+        success: boolean;
+        summary: {
+          campaign_id: string;
+          claimed_amount: number;
+          pending_amount: number;
+          expired_amount: number;
+          closed_at: string;
+        };
+      }>("admin_close_profit_share_campaign", { _campaign_id: campaignId });
+      if (data?.summary) {
+        setCloseSummary({
+          campaignId: data.summary.campaign_id,
+          claimed_amount: data.summary.claimed_amount,
+          pending_amount: data.summary.pending_amount,
+          expired_amount: data.summary.expired_amount,
+          closed_at: data.summary.closed_at,
+        });
+      }
+      toast.success("Kampanya kapatıldı — muhasebe özeti kaydedildi");
+      await loadCampaigns();
+    } catch (err) {
+      toast.error(translateError(err, "Kampanya kapatılamadı"));
+    } finally {
+      setClosingId(null);
+    }
+  };
+
+  const cancelDraft = async (campaignId: string) => {
+    if (!canManage) {
+      toast.error("Bu işlem için admin yetkisi gerekiyor");
+      return;
+    }
+    setCancellingId(campaignId);
+    try {
+      await rpc("admin_cancel_profit_share_campaign", { _campaign_id: campaignId });
+      toast.success("Taslak kampanya iptal edildi");
+      if (selectedCampaignId === campaignId) {
+        setSelectedCampaignId(null);
+        setAllocationRows([]);
+      }
+      await loadCampaigns();
+    } catch (err) {
+      toast.error(translateError(err, "Taslak iptal edilemedi"));
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -527,7 +597,7 @@ export default function AdminProfitShare() {
 
         {summary && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
               <StatCard
                 label="Komisyon geliri"
                 value={`+${fmtTRY(summary.platform_revenue)}`}
@@ -539,6 +609,13 @@ export default function AdminProfitShare() {
                 label="Platform gideri"
                 value={`-${fmtTRY(summary.platform_cost + (isAffiliateEnabled() ? summary.affiliate_cost : 0))}`}
                 hint={isAffiliateEnabled() ? "platform_cost + affiliate" : "platform_cost"}
+                icon={ArrowUpRight}
+                tone="danger"
+              />
+              <StatCard
+                label="Biriken genel gider"
+                value={`-${fmtTRY(summary.carried_overhead)}`}
+                hint="PS1 carry-forward (önceki dağıtımlar)"
                 icon={ArrowUpRight}
                 tone="danger"
               />
@@ -622,6 +699,30 @@ export default function AdminProfitShare() {
           </>
         )}
 
+        {closeSummary && (
+          <Card className="p-4 border-primary/30 bg-primary/5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Lock className="size-4 text-primary" />
+                  Kapanış özeti (muhasebe)
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Kapatıldı: {fmtDate(closeSummary.closed_at)}
+                </p>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                  <div className="text-success">Faydalandı: {fmtTRY(closeSummary.claimed_amount)}</div>
+                  <div className="text-warning-foreground">Bekleyen (kapatıldı): {fmtTRY(closeSummary.pending_amount)}</div>
+                  <div className="text-destructive">İptal / süresi dolan: {fmtTRY(closeSummary.expired_amount)}</div>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setCloseSummary(null)}>
+                <XCircle className="size-4" />
+              </Button>
+            </div>
+          </Card>
+        )}
+
         <Card className="overflow-hidden">
           <div className="px-4 py-3 border-b bg-muted/40 flex items-center gap-2">
             <CalendarDays className="size-4 text-primary" />
@@ -684,24 +785,72 @@ export default function AdminProfitShare() {
                         <div className="text-destructive">İptal: {fmtTRY(campaign.expired_amount)}</div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {campaign.status === "draft" ? (
-                          <Button
-                            size="sm"
-                            onClick={() => publish(campaign.id)}
-                            disabled={!canManage || publishingId === campaign.id}
-                          >
-                            {publishingId === campaign.id ? (
-                              <Loader2 className="size-4 mr-1 animate-spin" />
-                            ) : (
-                              <Send className="size-4 mr-1" />
-                            )}
-                            Yayınla
-                          </Button>
-                        ) : (
-                          <Button variant="outline" size="sm" onClick={() => loadAllocations(campaign.id)}>
-                            <Trophy className="size-3 mr-1" />
-                            Detay
-                          </Button>
+                        <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                          {campaign.status === "draft" && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => publish(campaign.id)}
+                                disabled={!canManage || publishingId === campaign.id}
+                              >
+                                {publishingId === campaign.id ? (
+                                  <Loader2 className="size-4 mr-1 animate-spin" />
+                                ) : (
+                                  <Send className="size-4 mr-1" />
+                                )}
+                                Yayınla
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => cancelDraft(campaign.id)}
+                                disabled={!canManage || cancellingId === campaign.id}
+                              >
+                                {cancellingId === campaign.id ? (
+                                  <Loader2 className="size-4 mr-1 animate-spin" />
+                                ) : (
+                                  <XCircle className="size-4 mr-1" />
+                                )}
+                                İptal
+                              </Button>
+                            </>
+                          )}
+                          {campaign.status === "published" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => loadAllocations(campaign.id)}
+                              >
+                                <Trophy className="size-3 mr-1" />
+                                Detay
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => closeCampaign(campaign.id)}
+                                disabled={!canManage || closingId === campaign.id}
+                              >
+                                {closingId === campaign.id ? (
+                                  <Loader2 className="size-4 mr-1 animate-spin" />
+                                ) : (
+                                  <Lock className="size-4 mr-1" />
+                                )}
+                                Kapat
+                              </Button>
+                            </>
+                          )}
+                          {(campaign.status === "closed" || campaign.status === "cancelled") && (
+                            <Button variant="outline" size="sm" onClick={() => loadAllocations(campaign.id)}>
+                              <Trophy className="size-3 mr-1" />
+                              Detay
+                            </Button>
+                          )}
+                        </div>
+                        {campaign.status === "closed" && campaign.closed_at && (
+                          <div className="text-[11px] text-muted-foreground mt-1">
+                            Kapatıldı: {fmtDate(campaign.closed_at)}
+                          </div>
                         )}
                       </td>
                     </tr>

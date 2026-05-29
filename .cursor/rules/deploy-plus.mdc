@@ -23,12 +23,15 @@ Kullanıcı mesajı **tam olarak** şunlardan biri olduğunda bu kural geçerlid
    npm run deploy -- --yes
    ```
    İnteraktif onay tercih edilirse `npm run deploy` (onay script içinde sorulur).
-5. **Sonuç:** Başarı/hata özetini Türkçe raporla. Hata varsa `docs/DEPLOY_PLUS.md` § Sorun giderme'ye yönlendir.
+   Script varsayılan olarak **önce GitHub'a commit+push** yapar, ardından sunucuya deploy eder.
+   Kullanıcı özel commit mesajı isterse: `npm run deploy -- --yes --message "açıklama"`
+   Yalnızca sunucu deploy (GitHub atla): `npm run deploy -- --yes --no-push`
+5. **Sonuç:** Başarı/hata özetini Türkçe raporla (GitHub push + sunucu deploy). Hata varsa `docs/DEPLOY_PLUS.md` § Sorun giderme'ye yönlendir.
 
 ## Güvenlik
 
 - `typecheck` başarısızsa deploy script durur — agent bunu bypass etmez.
-- `deploy.config.json` commit edilmemeli (gitignored).
+- `deploy.config.json` ve `.env` dosyaları commit edilmemeli (gitignored + script içi denylist).
 - Gerçek sunucu bilgisi yoksa deploy denemesi yapma; kurulum talimatı ver.
 
 ## Referans

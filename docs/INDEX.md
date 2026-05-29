@@ -26,7 +26,8 @@
 | Commerce merchant API (1-page) | `COMMERCE_MERCHANT_API_QUICKSTART.md` |
 | Postman — commerce merchant | `../postman/Wallet-Commerce-Merchant.postman_collection.json` |
 | Loyalty v3 | `LOYALTY_V3.md` |
-| Kazanç Dağıtımı (profit share) — backlog PS1–PS13 | `ROADMAP.md` § Kazanç Dağıtımı |
+| Kazanç Dağıtımı (profit share) — spek | `PROFIT_SHARE.md` |
+| Kazanç Dağıtımı — yol haritası / backlog | `ROADMAP.md` § Kazanç Dağıtımı |
 | Kazanç Dağıtımı — sayfa kontratı | `PAGE_CONTRACTS.md` § `/admin/profit-share` |
 | Aninda crypto (finance) | `ANINDA_KRIPTO_INTEGRATION.md` |
 | Aninda banka (FAST/EFT) | `ANINDA_BANKA_INTEGRATION.md` |

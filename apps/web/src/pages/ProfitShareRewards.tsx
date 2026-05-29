@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { ProfitShareReward } from "@wallet/shared/dto/member";
 import MemberLayout from "@/components/MemberLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,23 +12,6 @@ import { TxIdBadge } from "@/components/TxIdBadge";
 import { ArrowLeft, CheckCircle2, Gift, Loader2, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-
-type ProfitShareReward = {
-  allocation_id: string;
-  campaign_id: string;
-  period_type: "daily" | "weekly" | "monthly";
-  period_from: string;
-  period_to: string;
-  rank_no: number;
-  turnover_amount: number;
-  share_pct: number;
-  allocated_amount: number;
-  status: "pending" | "claimed" | "expired";
-  expires_at: string | null;
-  claimed_at: string | null;
-  expired_at: string | null;
-  claim_tx_public_no: string | null;
-};
 
 export default function ProfitShareRewards() {
   const { t } = useTranslation();
@@ -115,23 +99,23 @@ export default function ProfitShareRewards() {
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold">{t("member.profitShare.pendingTitle")}</h2>
                 {pending.map((row) => (
-                  <Card key={row.allocation_id} className="p-4">
+                  <Card key={row.id} className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-xs text-muted-foreground">
-                          {fmtDate(row.period_from)} - {fmtDate(row.period_to)}
+                          {fmtDate(row.campaign.periodFrom)} - {fmtDate(row.campaign.periodTo)}
                         </div>
-                        <div className="text-2xl font-bold text-success mt-1">+{fmtTRY(row.allocated_amount)}</div>
+                        <div className="text-2xl font-bold text-success mt-1">+{fmtTRY(row.allocatedAmount)}</div>
                         <div className="text-xs text-muted-foreground mt-1">
                           {t("member.profitShare.rankLine", {
-                            rank: row.rank_no,
-                            turnover: fmtTRY(row.turnover_amount),
-                            share: Number(row.share_pct).toFixed(4),
+                            rank: row.rankNo,
+                            turnover: fmtTRY(row.turnoverAmount),
+                            share: Number(row.sharePct).toFixed(4),
                           })}
                         </div>
-                        {row.expires_at && (
+                        {row.expiresAt && (
                           <div className="text-xs text-warning-foreground mt-1">
-                            {t("member.profitShare.expiresAt", { date: fmtDate(row.expires_at) })}
+                            {t("member.profitShare.expiresAt", { date: fmtDate(row.expiresAt) })}
                           </div>
                         )}
                       </div>
@@ -139,8 +123,8 @@ export default function ProfitShareRewards() {
                         {t("member.profitShare.claimable")}
                       </Badge>
                     </div>
-                    <Button className="w-full mt-4" onClick={() => claim(row.allocation_id)} disabled={claimingId === row.allocation_id}>
-                      {claimingId === row.allocation_id ? (
+                    <Button className="w-full mt-4" onClick={() => claim(row.id)} disabled={claimingId === row.id}>
+                      {claimingId === row.id ? (
                         <Loader2 className="size-4 mr-1 animate-spin" />
                       ) : (
                         <CheckCircle2 className="size-4 mr-1" />
@@ -157,18 +141,18 @@ export default function ProfitShareRewards() {
                 <h2 className="text-sm font-semibold">{t("member.profitShare.historyTitle")}</h2>
                 <div className="soft-card rounded-2xl divide-y divide-border overflow-hidden">
                   {history.map((row) => (
-                    <div key={row.allocation_id} className="p-4 flex items-center justify-between gap-3">
+                    <div key={row.id} className="p-4 flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="font-medium">{fmtTRY(row.allocated_amount)}</div>
+                        <div className="font-medium">{fmtTRY(row.allocatedAmount)}</div>
                         <div className="text-xs text-muted-foreground">
-                          {row.claimed_at
-                            ? t("member.profitShare.claimedAt", { date: fmtDate(row.claimed_at) })
-                            : row.expired_at
-                              ? t("member.profitShare.expiredAt", { date: fmtDate(row.expired_at) })
-                              : fmtDate(row.period_to)}
+                          {row.claimedAt
+                            ? t("member.profitShare.claimedAt", { date: fmtDate(row.claimedAt) })
+                            : row.expiredAt
+                              ? t("member.profitShare.expiredAt", { date: fmtDate(row.expiredAt) })
+                              : fmtDate(row.campaign.periodTo)}
                         </div>
-                        {row.claim_tx_public_no && (
-                          <TxIdBadge publicNo={row.claim_tx_public_no} className="mt-1" />
+                        {row.claimTxPublicNo && (
+                          <TxIdBadge publicNo={row.claimTxPublicNo} className="mt-1" />
                         )}
                       </div>
                       <Badge variant="outline">

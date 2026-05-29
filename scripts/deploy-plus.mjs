@@ -5,8 +5,12 @@
  * Kullanım:
  *   npm run deploy
  *   npm run deploy -- --yes
+ *   npm run deploy -- --message "feat: yeni ödeme akışı"
+ *   npm run deploy -- --no-push          # yalnızca sunucu deploy, GitHub atlanır
+ *   npm run deploy -- --dry-run          # commit/push/deploy önizlemesi
  *   DEPLOY_CONFIRM=1 npm run deploy
  *
+ * Akış: ön kontrol → GitHub commit+push (varsayılan) → sunucu deploy
  * Yapılandırma: deploy.config.json (deploy.config.example.json şablonu).
  * Dokümantasyon: docs/DEPLOY_PLUS.md
  */
@@ -73,6 +77,79 @@ function runCapture(cmd, args, opts = {}) {
     ...opts,
   });
   return result;
+}
+
+/** Hassas dosyalar commit'e asla girmemeli (.gitignore + ek kontrol). */
+const DENY_COMMIT_PATHS = [
+  /^deploy\.config\.json$/,
+  /^\.env$/,
+  /^\.env\.[^/]+$/,
+  /^apps\/api\/\.env$/,
+  /^apps\/web\/\.env\.local$/,
+];
+
+function parseCliArgs() {
+  const args = process.argv.slice(2);
+  let message = null;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--message" && args[i + 1]) {
+      message = args[++i];
+    }
+  }
+  return {
+    yes: args.includes("--yes") || process.env.DEPLOY_CONFIRM === "1",
+    noPush: args.includes("--no-push"),
+    dryRun: args.includes("--dry-run"),
+    message,
+  };
+}
+
+function isGitRepo() {
+  return runCapture("git", ["rev-parse", "--is-inside-work-tree"]).status === 0;
+}
+
+function resolvePushTarget(config) {
+  const head = runCapture("git", ["symbolic-ref", "--short", "HEAD"]);
+  if (head.status === 0 && head.stdout?.trim()) {
+    return { remote: config.gitRemote, branch: head.stdout.trim() };
+  }
+  return { remote: config.gitRemote, branch: config.gitBranch };
+}
+
+function assertNoSensitiveStaged() {
+  const staged = runCapture("git", ["diff", "--cached", "--name-only"]);
+  const files = (staged.stdout ?? "").trim().split("\n").filter(Boolean);
+  for (const file of files) {
+    if (DENY_COMMIT_PATHS.some((re) => re.test(file))) {
+      fail(
+        `Güvenlik: hassas dosya commit'e eklenemez: ${file}\n` +
+          `  .gitignore'da olmalı — izleniyorsa: git rm --cached ${file}`,
+      );
+    }
+  }
+}
+
+function failGitPush(remote, branch, result) {
+  const out = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  if (/permission denied|authentication failed|could not read from remote|403|401|invalid credentials|repository not found/i.test(out)) {
+    fail(
+      `GitHub push başarısız — kimlik doğrulama veya yetki hatası (${remote}/${branch}).\n` +
+        `  Kontrol: git remote -v\n` +
+        `  SSH: ssh -T git@github.com\n` +
+        `  HTTPS: gh auth login`,
+    );
+  }
+  if (result.stderr?.trim()) console.error(result.stderr.trim());
+  if (result.stdout?.trim()) console.error(result.stdout.trim());
+  fail(`Git push başarısız: ${remote}/${branch}`);
+}
+
+function gitPush(remote, branch, { setUpstream = false } = {}) {
+  const args = setUpstream ? ["push", "-u", remote, branch] : ["push", remote, branch];
+  const result = runCapture("git", args);
+  if (result.status !== 0) {
+    failGitPush(remote, branch, result);
+  }
 }
 
 function loadConfig() {
@@ -211,8 +288,7 @@ function preflight(config) {
 function checkGitStatus(config) {
   const warnings = [];
 
-  const inside = runCapture("git", ["rev-parse", "--is-inside-work-tree"]);
-  if (inside.status !== 0) {
+  if (!isGitRepo()) {
     if (config.deployMethod === "git") {
       fail("Git deposu değil — deployMethod=git için git gerekli.");
     }
@@ -220,58 +296,119 @@ function checkGitStatus(config) {
     return warnings;
   }
 
-  const branch = runCapture("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
-  const currentBranch = branch.stdout?.trim() ?? "HEAD";
+  const { branch: pushBranch } = resolvePushTarget(config);
 
   const status = runCapture("git", ["status", "--porcelain"]);
   const dirty = (status.stdout ?? "").trim();
   if (dirty) {
+    const count = dirty.split("\n").length;
+    log(`Commit edilmemiş ${count} dosya — deploy öncesi otomatik commit yapılacak.`);
+  }
+
+  if (pushBranch !== config.gitBranch && config.deployMethod === "git") {
     warnings.push(
-      `Commit edilmemiş değişiklikler var (${dirty.split("\n").length} dosya). ` +
-        (config.deployMethod === "git"
-          ? "Git modunda sunucu yalnızca push edilmiş commit'leri alır."
-          : "Rsync modunda çalışma ağacındaki dosyalar gönderilir."),
+      `Aktif dal "${pushBranch}"; sunucu config gitBranch="${config.gitBranch}" çeker. ` +
+        `Production için ${config.gitBranch} dalında deploy önerilir.`,
     );
   }
 
-  if (config.deployMethod === "git") {
-    const upstream = runCapture("git", [
-      "rev-parse",
-      "--abbrev-ref",
-      `${config.gitBranch}@{upstream}`,
-    ]);
-    if (upstream.status !== 0) {
-      warnings.push(
-        `Yerel dal "${config.gitBranch}" için upstream tanımlı değil. ` +
-          `git push -u ${config.gitRemote} ${config.gitBranch} ile ayarlayın.`,
-      );
-    } else {
-      const ahead = runCapture("git", [
-        "rev-list",
-        "--count",
-        `${config.gitBranch}@{upstream}..${config.gitBranch}`,
-      ]);
-      const aheadCount = Number(ahead.stdout?.trim() ?? "0");
-      if (aheadCount > 0) {
-        log(`${aheadCount} commit henüz push edilmemiş — push yapılacak.`);
-      }
-    }
-
-    if (currentBranch !== config.gitBranch) {
-      warnings.push(
-        `Aktif dal "${currentBranch}"; config gitBranch="${config.gitBranch}". ` +
-          `Push ${config.gitBranch} dalından yapılacak.`,
-      );
-    }
+  const remoteCheck = runCapture("git", ["remote", "get-url", config.gitRemote]);
+  if (remoteCheck.status !== 0) {
+    warnings.push(
+      `Git remote "${config.gitRemote}" tanımlı değil — push başarısız olabilir. ` +
+        `git remote add ${config.gitRemote} https://github.com/...`,
+    );
   }
 
   return warnings;
 }
 
-function gitPush(config) {
-  log(`Git push: ${config.gitRemote}/${config.gitBranch}…`);
-  run("git", ["push", config.gitRemote, config.gitBranch]);
-  ok("Git push tamam");
+function previewGitSync(config, cli) {
+  const { remote, branch } = resolvePushTarget(config);
+  log(`[dry-run] Hedef: ${remote}/${branch}`);
+
+  const status = runCapture("git", ["status", "--short"]);
+  if (status.stdout?.trim()) {
+    console.log(status.stdout.trim());
+    const msg =
+      cli.message ?? `deploy: ${new Date().toISOString().replace("T", " ").slice(0, 19)}`;
+    log(`[dry-run] git add . && git commit -m "${msg}"`);
+    log(`[dry-run] git push ${remote} ${branch} (yeni commit)`);
+    return;
+  }
+
+  log("[dry-run] Commit edilecek değişiklik yok.");
+
+  const upstream = `${remote}/${branch}`;
+  const upstreamExists = runCapture("git", ["rev-parse", "--verify", upstream]).status === 0;
+  if (!upstreamExists) {
+    log(`[dry-run] git push -u ${remote} ${branch}`);
+    return;
+  }
+
+  const ahead = runCapture("git", ["rev-list", "--count", `${upstream}..HEAD`]);
+  const aheadCount = Number(ahead.stdout?.trim() ?? "0");
+  if (aheadCount > 0) {
+    log(`[dry-run] git push ${remote} ${branch} (${aheadCount} commit)`);
+  } else {
+    log("[dry-run] Remote ile güncel — push gerekmiyor.");
+  }
+}
+
+function syncGitHub(config, cli) {
+  if (!isGitRepo()) {
+    fail("GitHub senkronizasyonu için git deposu gerekli.");
+  }
+
+  const { remote, branch } = resolvePushTarget(config);
+
+  const remoteCheck = runCapture("git", ["remote", "get-url", remote]);
+  if (remoteCheck.status !== 0) {
+    fail(
+      `Git remote "${remote}" tanımlı değil.\n` +
+        `  git remote add ${remote} https://github.com/KULLANICI/REPO.git`,
+    );
+  }
+
+  log(`GitHub: ${remoteCheck.stdout?.trim()}`);
+
+  const porcelain = runCapture("git", ["status", "--porcelain"]);
+  const dirty = (porcelain.stdout ?? "").trim();
+
+  if (dirty) {
+    log("Değişiklikler commit ediliyor…");
+    run("git", ["add", "."]);
+    assertNoSensitiveStaged();
+
+    const msg =
+      cli.message ?? `deploy: ${new Date().toISOString().replace("T", " ").slice(0, 19)}`;
+    run("git", ["commit", "-m", msg]);
+    ok(`Commit: ${msg}`);
+  } else {
+    log("Commit edilecek değişiklik yok.");
+  }
+
+  const upstream = `${remote}/${branch}`;
+  const upstreamExists = runCapture("git", ["rev-parse", "--verify", upstream]).status === 0;
+
+  if (!upstreamExists) {
+    log(`Upstream yok — ilk push: ${remote}/${branch}`);
+    gitPush(remote, branch, { setUpstream: true });
+    ok(`Git push tamam (${remote}/${branch})`);
+    return;
+  }
+
+  const ahead = runCapture("git", ["rev-list", "--count", `${upstream}..HEAD`]);
+  const aheadCount = Number(ahead.stdout?.trim() ?? "0");
+
+  if (aheadCount === 0) {
+    log(`Yerel dal güncel (${remote}/${branch}) — push atlandı.`);
+    return;
+  }
+
+  log(`${aheadCount} commit push ediliyor: ${remote}/${branch}…`);
+  gitPush(remote, branch);
+  ok(`Git push tamam (${remote}/${branch})`);
 }
 
 function rsyncToServer(config) {
@@ -352,17 +489,23 @@ function remoteDeploy(config) {
   ok("Sunucu deploy tamam");
 }
 
-function printSummary(config) {
+function printSummary(config, cli) {
   console.log("");
   console.log(`${colors.bold}${colors.green}Deploy başarılı${colors.reset}`);
   console.log(`  Sunucu : ${config.user}@${config.host}:${config.path}`);
   console.log(`  Yöntem : ${config.deployMethod}`);
+  if (!cli.noPush) {
+    const { remote, branch } = resolvePushTarget(config);
+    console.log(`  GitHub : ${remote}/${branch}`);
+  }
   console.log(`  Sağlık : curl -fsS http://${config.host}/health (nginx üzerinden)`);
   console.log("");
   console.log(`${colors.dim}Geri alma: docs/DEPLOY_PLUS.md § Geri alma${colors.reset}`);
 }
 
 async function main() {
+  const cli = parseCliArgs();
+
   console.log(`${colors.bold}Wallet deploy (+)${colors.reset}`);
   console.log("");
 
@@ -370,16 +513,34 @@ async function main() {
   preflight(config);
 
   const warnings = checkGitStatus(config);
+
+  if (cli.dryRun) {
+    log("Dry-run modu — sunucu deploy yapılmayacak.");
+    if (!cli.noPush) {
+      previewGitSync(config, cli);
+    } else {
+      log("[dry-run] GitHub push atlandı (--no-push).");
+    }
+    return;
+  }
+
   await confirmDeploy(warnings);
 
-  if (config.deployMethod === "git") {
-    gitPush(config);
+  if (!cli.noPush) {
+    syncGitHub(config, cli);
   } else {
+    log("GitHub push atlandı (--no-push).");
+    if (config.deployMethod === "git") {
+      warn("git modunda sunucu yalnızca remote'taki commit'leri alır.");
+    }
+  }
+
+  if (config.deployMethod === "rsync") {
     rsyncToServer(config);
   }
 
   remoteDeploy(config);
-  printSummary(config);
+  printSummary(config, cli);
 }
 
 main().catch((err) => {
