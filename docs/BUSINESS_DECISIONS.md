@@ -26,6 +26,94 @@
 | P0-21 | Geç topup callback / session TTL | Süreyi kaldır — finans merchant kurallara göre bildirim atınca bakiye yüklensin (geç callback için session TTL engeli yok). | approved | 2026-05-29 |
 | P0-22 | Topup tutar uyuşmazlığı | Finans merchant'tan hangi tutar gelirse üyeye o yüklensin (sağlayıcı tutarını kabul et). | approved | 2026-05-29 |
 | P0-32 | Admin remediation RPC'leri | Şimdilik kalsın (ertelendi). | approved (defer) | 2026-05-29 |
+| K1 | Sadakat harcama bakiyesi | **Gelecek tasarım onaylı** — program statüsüne göre üye bakiyesi/kredi; yapılandırılabilir tavan; yalnızca Akış A (spend). Şu an **kapalı**. | approved (future) | 2026-05-29 |
+| K2 | Admin loyalty settings → backend | **Evet** — `/admin/settings` sadakat anahtarları `settings` tablosuna bağlanır. | approved | 2026-05-29 |
+| K3 | Cashback | **A** — Kapalı kalır (L3 ile uyumlu). | approved | 2026-05-29 |
+| K4 | Referral payout | **A** — Anti-farming hazır olana kadar kapalı (L5 ile uyumlu). | approved | 2026-05-29 |
+| K5 | 7 admin remediation RPC | **A** — Şimdi uygula (P0-32 defer iptal). | approved | 2026-05-29 |
+| K6 | Merchant cashout pipeline | **A** — MVP + USDT withdraw komisyon alanı; komisyon platform geliri. | approved | 2026-05-29 |
+| K7 | Smoke 4 fail | **A** — `smoke-all.mjs` düzelt. | approved | 2026-05-29 |
+| K8 | Deploy | **B** — Yalnızca GitHub; sunucu deploy henüz yok. | approved | 2026-05-29 |
+| K9 | Aninda | **B** — Önce staging. | approved | 2026-05-29 |
+| K10 | Finance topup URL | **B** — Mock URL yeterli (şimdilik). | approved | 2026-05-29 |
+| K11 | Affiliate | **B** — Kapalı kalır. | approved | 2026-05-29 |
+| K12 | Loyalty formül değişiklikleri | **C** — İleriye dönük; retroaktif yeniden hesap yok. | approved | 2026-05-29 |
+
+---
+
+## K1–K12 Kararlar (2026-05-29 backlog)
+
+### K1 — Sadakat harcama bakiyesi ✅ (gelecek tasarım — şu an kapalı)
+
+**Durum:** Özellik **şu an kapalı**; aşağıdaki kurallar aktivasyon öncesi onaylı tasarımdır.
+
+**Karar:** Üye, sadakat programı statüsüne (tier / barem) göre **program bazlı bakiye/kredi** alır. Bu fayda:
+
+- **Merchant komisyon indirimi değildir** (platform ücreti düşürme yok).
+- **Merchant faydası değildir** (settlement / net artış yok).
+- Üyeye doğrudan harcanabilir sadakat bakiyesi olarak tanımlanır.
+
+**Kural 1 — Tavan:** Bu sadakat bakiyesi için yapılandırılabilir bir **maksimum tutar (ceiling)** zorunludur (global veya tier bazlı — uygulama detayı implementasyonda).
+
+**Kural 2 — Harcama kısıtı:** Bakiye **yalnızca merchant spend** (Akış A / ödeme kodu) için kullanılabilir. Aşağıdakilerde **kullanılamaz**:
+
+| Akış | Kullanım |
+|------|----------|
+| Akış A — spend (ödeme kodu) | ✅ İzinli |
+| Akış B — merchant credit pull | ❌ Yasak |
+| Akış C — topup | ❌ Yasak |
+| Akış D — withdraw | ❌ Yasak |
+| Diğer amaçlar | ❌ Yasak |
+
+Hard Rule #7 uyumu korunur: üye komisyon ödemez; sadakat bakiyesi gross tutardan düşülür, merchant'a ek maliyet yansıtılmaz.
+
+**Şema / alan notu (implementasyon niyeti):** Mevcut `loyalty_tiers.commission_discount_pct` alanı bu semantiği taşımıyor. Aktivasyonda ya alan **yeniden adlandırılır** ya da ayrı bir **`loyalty_spend_balance`** (veya eşdeğeri üye bakiye kolonu + tier kuralı) kavramı eklenir. **Şimdilik kod değişikliği yok** — yalnızca tasarım kaydı.
+
+**Önceki taslak (iptal):** Merchant platform ücreti indirimi (`commission_discount_pct` → merchant net artış) — K1 bu yönde **onaylanmadı**.
+
+### K2 — Admin loyalty settings
+
+`/admin/settings` sadakat sekmesindeki anahtarlar (`points_per_spend_unit`, `withdraw_penalty_per_unit`, vb.) `settings` tablosu + allowlist üzerinden okunur/yazılır.
+
+### K3 — Cashback
+
+L3 ile aynı: cashback kapalı; ileride açılırsa max %1,5.
+
+### K4 — Referral payout
+
+L5 ile aynı: anti-farming production-ready olana kadar ödeme kapalı.
+
+### K5 — Admin remediation RPC'leri
+
+7 eksik admin RPC (referral nitelendirme, override silme, affiliate dashboard, vb.) — P0-32 defer iptal; uygulama onaylı.
+
+### K6 — Merchant cashout
+
+MVP cashout pipeline; USDT withdraw formunda komisyon girişi; komisyon platform geliri olarak kaydedilir.
+
+### K7 — Smoke
+
+`smoke-all.mjs` içindeki 4 bilinen fail düzeltilir.
+
+### K8 — Deploy
+
+GitHub push/commit; production sunucu deploy bu aşamada yok (K8-B).
+
+### K9 — Aninda
+
+Canlı öncesi staging ortamında doğrulama.
+
+### K10 — Finance topup init URL
+
+Dev/mock URL yeterli; canlı init URL sonraki ops adımı.
+
+### K11 — Affiliate
+
+`affiliate_system_enabled` kapalı kalır.
+
+### K12 — Loyalty formül
+
+Tier/puan formülü değişiklikleri yalnızca ileriye dönük; geçmiş `loyalty_points_log` retroaktif yeniden hesaplanmaz.
 
 ---
 
@@ -201,7 +289,7 @@ Webhook'ta beklenen tutar ≠ sağlayıcı tutarı durumunda 500 dönmek yerine 
 
 ## P0-32 — Admin remediation RPC'leri
 
-7 eksik admin RPC (referral nitelendirme, override silme, affiliate dashboard, vb.) — **şimdilik ertelendi**. Mevcut REST operasyonları yeterli.
+7 eksik admin RPC (referral nitelendirme, override silme, affiliate dashboard, vb.) — **K5 ile defer iptal**; uygulama onaylı (2026-05-29).
 
 ---
 
@@ -220,4 +308,7 @@ Webhook'ta beklenen tutar ≠ sağlayıcı tutarı durumunda 500 dönmek yerine 
 | 9 | PS6 | Kapanış özeti + muhasebe onayı |
 | 10 | PS12–PS13 | Spek + E2E ✅ (2026-05-29) |
 | — | L3, L4, L5 | Politika — çoğu mevcut guard ile uyumlu; kod değişikliği minimal |
-| — | P0-32 | Ertelendi |
+| 11 | K5 | Admin remediation RPC'leri (P0-32 defer iptal) |
+| 12 | K6 | Merchant cashout MVP + USDT komisyon |
+| — | K8–K11 | Ops / politika — kod minimal veya sonraki sprint |
+| — | K1 | Sadakat harcama bakiyesi — gelecek tasarım onaylı; aktivasyon bekliyor |

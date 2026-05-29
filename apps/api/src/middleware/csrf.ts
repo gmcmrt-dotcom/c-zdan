@@ -41,6 +41,7 @@ const SKIP_EXACT_PATHS = new Set<string>([
   "/api/auth/password/reset-request",
   "/api/auth/password/reset-confirm",
   "/api/auth/email/verify",
+  "/api/auth/identifier-exists",
 ]);
 
 function ensureCsrfCookie(req: Request, res: Response): string {

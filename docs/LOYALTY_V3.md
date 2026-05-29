@@ -65,3 +65,22 @@ happened before it leaves the wallet.
 `loyalty_points_log` carries a unique index on `(user_id, reason, reference_id)`
 where `reference_id IS NOT NULL`. All point awards write through services in
 `apps/api/src/services/member.service.ts` and `payment-code.service.ts`.
+
+## Sadakat harcama bakiyesi (gelecek — şu an kapalı)
+
+> **Onaylı tasarım:** `docs/BUSINESS_DECISIONS.md` § K1 (2026-05-29)
+
+Özellik **şu an kapalı**. Aktivasyonda üye, sadakat programı statüsüne göre
+**program bazlı harcanabilir bakiye/kredi** alır — merchant komisyon indirimi
+veya merchant faydası değildir.
+
+| Kural | Açıklama |
+|-------|----------|
+| **Tavan** | Yapılandırılabilir maksimum sadakat bakiyesi (ceiling) |
+| **Harcama** | Yalnızca **Akış A** (merchant spend / ödeme kodu) |
+| **Yasak** | Withdraw, topup, merchant credit pull (Akış B), diğer tüm akışlar |
+
+**Şema niyeti:** `loyalty_tiers.commission_discount_pct` bu semantiği karşılamaz;
+implementasyonda yeniden adlandırma veya ayrı `loyalty_spend_balance` (üye
+bakiye kolonu + tier kuralı) eklenmesi beklenir. Kod değişikliği aktivasyon
+sprint'ine ertelendi.

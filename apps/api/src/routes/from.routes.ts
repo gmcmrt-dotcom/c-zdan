@@ -1118,9 +1118,32 @@ const merchantApplicationsHandler: TableHandler = async ({ req, body }) => {
 const SETTINGS_ALLOWLIST: Record<string, z.ZodTypeAny> = {
   affiliate_system_enabled: z.boolean(),
   topup_session_ttl_seconds: z.number().int().positive().max(60 * 60 * 24),
+  withdraw_session_ttl_seconds: z.number().int().positive().max(60 * 60 * 24),
+  payment_code_default_ttl_seconds: z.number().int().positive().max(60 * 60 * 24),
   merchant_idempotency_ttl_days: z.number().int().positive().max(90),
   loyalty_default_multiplier: z.number().min(0).max(100),
   password_otp_ttl_minutes: z.number().int().positive().max(60),
+  // OTP (admin BO /admin/settings)
+  otp_length: z.number().int().min(4).max(8),
+  otp_ttl_minutes: z.number().int().positive().max(60),
+  otp_max_attempts: z.number().int().positive().max(20),
+  otp_resend_seconds: z.number().int().positive().max(600),
+  // Loyalty (admin BO /admin/settings — K2)
+  first_topup_bonus: z.number().int().min(0).max(1_000_000),
+  first_topup_bonus_v2: z.number().int().min(0).max(1_000_000),
+  monthly_active_threshold: z.number().int().min(1).max(1000),
+  monthly_active_bonus: z.number().int().min(0).max(1_000_000),
+  monthly_active_bonus_v2: z.number().int().min(0).max(1_000_000),
+  birthday_bonus_points: z.number().int().min(0).max(1_000_000),
+  profile_complete_bonus: z.number().int().min(0).max(1_000_000),
+  points_per_topup_unit: z.number().positive().max(1_000_000),
+  points_per_topup_unit_v2: z.number().positive().max(1_000_000),
+  points_per_spend_unit: z.number().positive().max(1_000_000),
+  points_per_spend_unit_v2: z.number().positive().max(1_000_000),
+  withdraw_penalty_per_unit: z.number().positive().max(1_000_000),
+  turnover_bonus_log_base: z.number().min(1.01).max(10),
+  // System
+  payment_code_lengths: z.array(z.number().int().positive().max(60 * 24 * 365)).min(1).max(20),
 };
 
 const settingsHandler: TableHandler = async ({ req, body }) => {
@@ -1298,7 +1321,11 @@ function genericReadHandler(opts: GenericReadOpts): TableHandler {
     const orderRequested = body.order;
     if (orderRequested && opts.orderCols?.[orderRequested.col]) {
       const col = opts.orderCols[orderRequested.col]!;
-      q = q.orderBy(orderRequested.asc ? asc(col) : desc(col));
+      const ascending =
+        orderRequested.asc !== undefined
+          ? orderRequested.asc
+          : (opts.defaultOrder?.asc ?? true);
+      q = q.orderBy(ascending ? asc(col) : desc(col));
     } else if (opts.defaultOrder) {
       q = q.orderBy(opts.defaultOrder.asc ? asc(opts.defaultOrder.col) : desc(opts.defaultOrder.col));
     }

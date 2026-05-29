@@ -23,6 +23,7 @@
 import crypto from "node:crypto";
 import { exec as execCb } from "node:child_process";
 import { promisify } from "node:util";
+import { authenticator } from "otplib";
 const exec = promisify(execCb);
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
@@ -170,7 +171,7 @@ async function main() {
 
   // ----------------------------- public -----------------------------
   await call("public.health", "GET", "/health");
-  await call("public.api", "GET", "/api");
+  await call("public.readyz", "GET", "/readyz");
 
   // ----------------------------- auth ------------------------------
   const tempEmail = `smoke-${Date.now()}@example.com`;
@@ -223,10 +224,11 @@ async function main() {
     headers: T,
     body: { friendlyName: "smoke" },
   });
-  if (enroll.json?.factorId) {
+  if (enroll.json?.factorId && enroll.json?.secret) {
+    const mfaCode = authenticator.generate(enroll.json.secret);
     await call("auth.mfa.unenroll", "POST", "/api/auth/mfa/unenroll", {
       headers: T,
-      body: { factorId: enroll.json.factorId },
+      body: { factorId: enroll.json.factorId, code: mfaCode },
     });
   }
 
@@ -881,6 +883,7 @@ async function main() {
   if (signedUrl) {
     await call("storage.signed-url.fetch-404", "GET", signedUrl, {
       expect: 404,
+      headers: A,
     });
   }
   // Upload a 1×1 PNG, sign + fetch

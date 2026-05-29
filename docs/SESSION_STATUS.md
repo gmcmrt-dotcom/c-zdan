@@ -5,7 +5,20 @@
 > in git. Full audit roadmap (with per-finding citations) lives in
 > `.cursor/plans/wallet_production_go-live_audit_591d4884.plan.md`.
 
-**Last updated:** 2026-05-29 (PS12–PS13 profit share spek + E2E)
+**Last updated:** 2026-05-29 (login API crash fix — K5 shared DTO)
+
+## Login "Beklenmeyen bir hata" ✅ (2026-05-29)
+
+**Kök neden:** K5 `admin.ts` DTO'ları `MoneyAmount`'ı `../index`'ten import ediyordu → döngüsel bağımlılık → API açılışta `ReferenceError: Cannot access 'MoneyAmount' before initialization` ile çöküyordu. Web (`:8080`) ayaktayken API (`:3000`) kapalı → Vite proxy `Failed to fetch` → FE `translateError` fallback: "Beklenmeyen bir hata oluştu".
+
+**Fix:** `MoneyAmount` → `packages/shared/src/dto/common.ts`; `admin.ts` import `./common`. `npm run typecheck` ✅ · curl login 200.
+
+**Kullanıcı:** Her iki dev sunucusu çalışsın — `npm run dev` (veya API `:3000` + web `:8080` ayrı). Admin: `admin@wallet.local` / `Admin1234` → MFA challenge beklenir (`requiresMfa=true`).
+
+## Loyalty tier görüntüleme ✅ (2026-05-29)
+
+- **Sıra:** `genericReadHandler` — `order.asc` yoksa `defaultOrder.asc` (loyalty: `sort_order` artan); üye/admin tier listeleri `asc: true` açık.
+- **İsimler:** Roman I/II/III → **Plus / Pro / Prime** (`seed.ts`, migration `0021_loyalty_tier_display_names.sql`).
 
 ## Deploy "+" otomasyonu ✅ (2026-05-29)
 
@@ -79,6 +92,8 @@ node scripts/verify-admin-perms.mjs   # exit 0 = admin BO OK
 
 | Batch | Headline | Mig |
 |-------|----------|-----|
+| **AI** | **K5 + K6** — 9 admin remediation RPC (referral qualify/cancel/config, permission overrides, affiliate costs/payout); commerce cashout MVP (`merchant-cashout-request` + webhook callback + USDT komisyon alanı); `profit-share` cashout fee geliri. | — |
+| **AH** | **K2 + K7** — admin loyalty/OTP settings allowlist + seed (`0020`); `Settings.tsx` `settings:manage`; smoke 4 fail fix (`/readyz`, CSRF, MFA TOTP, storage Bearer). **K1–K12** kararlar `BUSINESS_DECISIONS.md`. | `0020_loyalty_settings` |
 | **AG** | **PS12–PS13** profit share — `docs/PROFIT_SHARE.md` (iş+teknik spek); Playwright `e2e/admin/profit-share.spec.ts` + `e2e/member/profit-share.spec.ts`; INDEX / ROADMAP / BUSINESS_DECISIONS güncellendi. | — |
 | **AF** | **PS5–PS11** profit share — yayın bildirimi (email+in-app+push stub); kapanış özeti+audit (`closed_at`/`closed_by`); carried_overhead admin önizleme; üye DTO camelCase hizalama; pool remainder dağıtımı (PS10); cancel/close RPC+UI. | `0019_profit_share_close` |
 | **AE** | **PS1 + PS7** profit share — gerçek gelir/gider (`transactions` + `provider_ledger` + affiliate accrual); carry-forward `profit_share_cumulative_overhead` settings + kampanya `carried_overhead` snapshot; publish audit; önizleme API `{ summary, allocations }`. | `0018_profit_share_overhead` |
@@ -103,10 +118,10 @@ node scripts/verify-admin-perms.mjs   # exit 0 = admin BO OK
 | **A′** Seed ledger verify | ✅ **0 critical / 0 error** (temiz DB) | `npm run test:seed:verify` — **smoke-all'dan önce** koş |
 | **B** Manuel checklist | **Done** | `docs/MANUAL_TEST_CHECKLIST.md` |
 | **C** Playwright E2E | ✅ **69/69** (tam suite, PS13 +4 spec) · Merchant BO alt kümesi **18/18** | `npm run test:e2e` → `e2e/merchant/*` |
-| **D** API smoke | ✅ **216/220 pass** (tüm merchant BO REST yeşil) | `node scripts/smoke-all.mjs` — API restart sonrası |
+| **D** API smoke | ✅ **220/220 pass** (K7) | `node scripts/smoke-all.mjs` — API restart sonrası |
 | **F** Pratik gap runner | ✅ **35/35** (local, temiz seed + withdraw tam döngü sonrası verify 0/0) | `node scripts/run-pratik-test-plan.mjs` |
 
-**Smoke kalan 4 fail (pre-existing / ortam):** `GET /api` 404, `identifier-exists` CSRF (Bearer-only runner), MFA unenroll step-up, storage signed-url fetch Bearer zorunluluğu.
+**Smoke:** K7 ile 4 bilinen fail giderildi (`/readyz`, CSRF `identifier-exists`, MFA unenroll TOTP, storage signed-url Bearer).
 
 **Temiz ledger integrity kontrolü (local):**
 
@@ -126,7 +141,7 @@ node scripts/verify-admin-perms.mjs  # admin BO PERMISSION_DENIED yok mu?
 
 ## Open work (priority order)
 
-> **Onaylı iş kararları:** `docs/BUSINESS_DECISIONS.md` (2026-05-29). Aşağıdaki sıra uygulama önceliğidir.
+> **Onaylı iş kararları:** `docs/BUSINESS_DECISIONS.md` § K1–K12 (2026-05-29). Aşağıdaki sıra uygulama önceliğidir.
 
 1. ~~**P0-21 + P0-22 — topup callback**~~ ✅ (2026-05-29) — `topup.service.ts` `finalizeTopupCallback`.
 
@@ -135,8 +150,10 @@ node scripts/verify-admin-perms.mjs  # admin BO PERMISSION_DENIED yok mu?
    - ~~**L1 Faz 2:** streak + cooldown + spend formülü~~ ✅ (2026-05-29) — `loyalty-scoring.service.ts` + `payment-code.service`.
    - ~~**L2:** otomatik tier yükseltme, manuel düşürme~~ ✅ (2026-05-29) — `loyalty-tier.service.ts`.
    - ~~**L6:** 6×3 barem seed + migration (turnover ×20)~~ ✅ (2026-05-29) — `0017_loyalty_barems.sql`.
-   - **L3/L4/L5:** politika onaylı; cashback kapalı, referral ödeme anti-farming'e kadar kapalı, profit share bağımsız.
-   - **Kod/dok gap:** `commission_discount_pct` ücretlere uygulanmıyor; admin loyalty settings UI backend'e bağlı değil.
+   - **L3/L4/L5:** politika onaylı (K3/K4); cashback kapalı, referral ödeme anti-farming'e kadar kapalı, profit share bağımsız.
+   - ~~**K2:** admin loyalty settings → `settings` allowlist + seed~~ ✅ (2026-05-29).
+   - ~~**K1:** sadakat harcama bakiyesi gelecek tasarımı~~ ✅ (2026-05-29) — program bazlı üye bakiyesi; tavan + yalnızca Akış A; şu an **kapalı**; `commission_discount_pct` → rename veya `loyalty_spend_balance` (implementasyon sprint'inde). Detay: `BUSINESS_DECISIONS.md` § K1 · `LOYALTY_V3.md` § Sadakat harcama bakiyesi.
+   - **K12:** formül değişiklikleri ileriye dönük; retroaktif recalc yok.
 
 3. ~~**Kazanç Dağıtımı — teknik uygulama (PS1–PS6 onaylı)**~~ ✅ (2026-05-29) — spek: `docs/PROFIT_SHARE.md` · PS1–PS13 tamam.
    - ~~**PS1 + PS7** …~~ ✅
@@ -145,11 +162,17 @@ node scripts/verify-admin-perms.mjs  # admin BO PERMISSION_DENIED yok mu?
    - ~~**PS6** …~~ ✅
    - ~~**PS12–PS13** …~~ ✅ (2026-05-29) — `PROFIT_SHARE.md` + Playwright E2E.
 
-4. **P0-32** — 7 admin remediation RPC — **ertelendi** (onaylı defer).
+4. ~~**K5 — P0-32 admin remediation RPC'leri**~~ ✅ (2026-05-29) — `referrals.service`, `permissions.service`, `affiliate.service` + `rpc.routes.ts`.
 
-5. **Aninda go-live (ops)** — live credentials, callback URL, cash_pool alignment.
+5. ~~**K6 — Merchant cashout MVP**~~ ✅ (2026-05-29) — `merchant-cashout.service.ts`, `fn.routes` + `webhooks.routes`, USDT komisyon UI.
 
-6. **Finance `topup_init_url`** — seed'de Papara mock URL var; Havale `null` (dev mock `/api/dev/mock-merchant/*` ile test). Canlı init URL her aktif finance merchant için gerekli.
+6. **K8 — Deploy** — yalnızca GitHub; sunucu deploy henüz yok.
+
+7. **K9 — Aninda staging** — canlı öncesi staging doğrulama.
+
+8. **K10 — Finance `topup_init_url`** — mock URL yeterli (dev); canlı init URL sonraki ops.
+
+9. **K11 — Affiliate** — kapalı kalır.
 
 ## Reference
 

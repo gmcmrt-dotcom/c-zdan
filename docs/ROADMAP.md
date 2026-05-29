@@ -38,8 +38,8 @@ Sıra — onaylı iş kararlarına göre (`docs/BUSINESS_DECISIONS.md` uygulama 
 
 | Gap | Durum |
 |-----|-------|
-| `commission_discount_pct` tier'da tanımlı; ücret hesabına uygulanmıyor | Açık |
-| Admin loyalty settings UI backend'e bağlı değil | Açık |
+| `commission_discount_pct` tier'da tanımlı; ücret hesabına uygulanmıyor | Açık (K1 — onay bekliyor) |
+| ~~Admin loyalty settings UI backend'e bağlı değil~~ | ✅ K2 (2026-05-29) |
 | K9 formül düzeltmesi (Option C — mevcut fazla kazanım devam) | İş kararı bekliyor — `docs/UYGULANAN_DEGISIKLIKLER.md` |
 
 ### Referans

@@ -255,8 +255,27 @@ webhooksRouter.post("/merchant/cashout", async (req, res) => {
     res.status(401).json({ success: false, error_code: "BAD_SIG" });
     return;
   }
-  // Phase 5 stub: actual session update lives in a merchant-cashout service to be added later.
-  // Until that service exists, return 501 so the provider knows the call was
-  // verified but cannot be persisted (instead of the misleading "accepted" 202).
-  res.status(501).json({ success: false, error_code: "NOT_IMPLEMENTED" });
+  let body: Record<string, unknown> = {};
+  try {
+    body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+  } catch {
+    res.status(400).json({ success: false, error_code: "BAD_JSON" });
+    return;
+  }
+  const statusRaw = String(body.status ?? body.Status ?? "").toLowerCase();
+  const status = statusRaw === "success" || statusRaw === "ok" || statusRaw === "approved" ? "success" : "failed";
+  try {
+    const { finalizeMerchantCashoutCallback } = await import("../services/merchant-cashout.service");
+    const out = await finalizeMerchantCashoutCallback({
+      publicNo: body.public_no ? String(body.public_no) : undefined,
+      merchantRef: body.merchant_ref ? String(body.merchant_ref) : undefined,
+      status,
+      externalTxId: body.external_tx_id ? String(body.external_tx_id) : null,
+      failureReason: body.failure_reason ? String(body.failure_reason) : null,
+    });
+    res.status(200).json({ ...out, success: true });
+  } catch (err) {
+    logger.error({ err }, "merchant cashout callback failed");
+    res.status(500).json({ success: false, error_code: "INTERNAL" });
+  }
 });

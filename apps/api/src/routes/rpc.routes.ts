@@ -27,6 +27,9 @@ import * as withdraw from "../services/withdraw.service";
 import * as adminMembers from "../services/admin/members.service";
 import * as adminMerchants from "../services/admin/merchants.service";
 import * as profitShare from "../services/admin/profit-share.service";
+import * as adminReferrals from "../services/admin/referrals.service";
+import * as adminPermissions from "../services/admin/permissions.service";
+import * as adminAffiliate from "../services/admin/affiliate.service";
 import { hasStaffRole } from "../services/auth.service";
 import * as merchantSelf from "../services/merchant/self.service";
 import { writeAudit } from "../services/admin/audit";
@@ -817,6 +820,76 @@ const handlers: Record<string, RpcHandler> = {
       ip: clientIp(req),
     }),
 
+  // ---------- admin remediation (K5 / P0-32) ----------
+  admin_qualify_referral_manual: async (req, a) =>
+    adminReferrals.qualifyReferralManual({
+      actorId: user(req).id,
+      referralId: String(arg(a, "_referral_id")),
+      reason: String(arg(a, "_reason")),
+      ip: clientIp(req),
+      userAgent: req.get("user-agent") ?? null,
+    }),
+  admin_cancel_referral: async (req, a) =>
+    adminReferrals.cancelReferral({
+      actorId: user(req).id,
+      referralId: String(arg(a, "_referral_id")),
+      reason: String(arg(a, "_reason")),
+      ip: clientIp(req),
+      userAgent: req.get("user-agent") ?? null,
+    }),
+  admin_set_referral_config: async (req, a) =>
+    adminReferrals.setReferralConfig({
+      actorId: user(req).id,
+      payload: arg(a, "_payload") as never,
+      ip: clientIp(req),
+      userAgent: req.get("user-agent") ?? null,
+    }),
+  admin_set_user_override: async (req, a) =>
+    adminPermissions.setUserOverride({
+      actorId: user(req).id,
+      userId: String(arg(a, "_user_id")),
+      resource: String(arg(a, "_resource")),
+      action: String(arg(a, "_action")),
+      granted: Boolean(arg(a, "_granted")),
+      reason: (arg(a, "_reason") as string | null) ?? null,
+      ip: clientIp(req),
+      userAgent: req.get("user-agent") ?? null,
+    }),
+  admin_remove_user_override: async (req, a) =>
+    adminPermissions.removeUserOverride({
+      actorId: user(req).id,
+      userId: String(arg(a, "_user_id")),
+      resource: String(arg(a, "_resource")),
+      action: String(arg(a, "_action")),
+      ip: clientIp(req),
+      userAgent: req.get("user-agent") ?? null,
+    }),
+  admin_affiliate_costs: async (_req, a) =>
+    adminAffiliate.affiliateCosts({ since: arg(a, "_since") as string | undefined }),
+  admin_approve_affiliate_payout: async (req, a) =>
+    adminAffiliate.approveAffiliatePayout({
+      actorId: user(req).id,
+      payoutId: String(arg(a, "_payout_id")),
+      ip: clientIp(req),
+      userAgent: req.get("user-agent") ?? null,
+    }),
+  admin_reject_affiliate_payout: async (req, a) =>
+    adminAffiliate.rejectAffiliatePayout({
+      actorId: user(req).id,
+      payoutId: String(arg(a, "_payout_id")),
+      reason: String(arg(a, "_reason")),
+      ip: clientIp(req),
+      userAgent: req.get("user-agent") ?? null,
+    }),
+  admin_mark_affiliate_payout_paid: async (req, a) =>
+    adminAffiliate.markAffiliatePayoutPaid({
+      actorId: user(req).id,
+      payoutId: String(arg(a, "_payout_id")),
+      transferRef: (arg(a, "_transfer_ref") as string | null) ?? null,
+      ip: clientIp(req),
+      userAgent: req.get("user-agent") ?? null,
+    }),
+
   // ---------- merchant BO ----------
   merchant_self: async (req) => {
     if (!req.merchant) throw new BadRequestError("MERCHANT_CONTEXT_MISSING");
@@ -903,6 +976,15 @@ const adminRpcPerms: Record<string, { resource: string; action: string }> = {
   admin_publish_profit_share_campaign: { resource: "profit_share", action: "manage" },
   admin_close_profit_share_campaign: { resource: "profit_share", action: "manage" },
   admin_cancel_profit_share_campaign: { resource: "profit_share", action: "manage" },
+  admin_qualify_referral_manual: { resource: "referrals", action: "manage" },
+  admin_cancel_referral: { resource: "referrals", action: "manage" },
+  admin_set_referral_config: { resource: "referrals", action: "manage" },
+  admin_set_user_override: { resource: "permissions", action: "manage_overrides" },
+  admin_remove_user_override: { resource: "permissions", action: "manage_overrides" },
+  admin_affiliate_costs: { resource: "affiliates", action: "view" },
+  admin_approve_affiliate_payout: { resource: "affiliates", action: "manage" },
+  admin_reject_affiliate_payout: { resource: "affiliates", action: "manage" },
+  admin_mark_affiliate_payout_paid: { resource: "affiliates", action: "manage" },
   // admin_create_method_type / admin_create_*_template / admin_create_chat_canned
   // already check req.perms inline; we still require staff role here.
   admin_create_method_type: { resource: "method_types", action: "manage" },

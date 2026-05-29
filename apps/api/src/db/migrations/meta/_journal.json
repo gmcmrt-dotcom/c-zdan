@@ -141,6 +141,13 @@
       "when": 1779795000000,
       "tag": "0019_profit_share_close",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1779800000000,
+      "tag": "0020_loyalty_settings",
+      "breakpoints": true
     }
   ]
 }

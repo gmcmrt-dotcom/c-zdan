@@ -237,12 +237,23 @@ const fns: Record<string, Fn> = {
     });
   },
 
-  "merchant-cashout-request": async (_req, _b) => {
-    // P1 — Commerce cashout pipeline is unimplemented; the previous stub
-    // raised 501 with a generic message but the route was still mounted and
-    // counted against rate limits. Return a structured CASHOUT_DISABLED so
-    // the merchant UI shows a useful banner.
-    throw new AppError(503, "CASHOUT_DISABLED", "merchant cashout is currently disabled");
+  "merchant-cashout-request": async (req, b) => {
+    if (!req.merchant) throw new AppError(403, "MERCHANT_REQUIRED");
+    const { admin } = await import("@wallet/shared");
+    const parsed = admin.MerchantCashoutRequest.parse(b);
+    const { requestMerchantCashout } = await import("../services/merchant-cashout.service");
+    return requestMerchantCashout({
+      actorUserId: user(req).id,
+      merchantUserId: req.merchant.merchantUserId,
+      role: req.merchant.role,
+      contextMerchantId: req.merchant.merchantId,
+      merchantId: parsed.merchant_id,
+      methodCode: parsed.method_code,
+      amount: parsed.amount,
+      payoutAddress: parsed.payout_address,
+      commission: parsed.commission,
+      ip: clientIp(req),
+    });
   },
 
   "chat-attachment-scan": async (_req, _b) => {

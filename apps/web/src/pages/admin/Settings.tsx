@@ -170,7 +170,7 @@ export default function AdminSettings() {
           ) : (
             <Input value={valueAsString} onChange={(e) => update(e.target.value)} className="h-9 max-w-md" />
           )}
-          <Can do="settings:update">
+          <Can do="settings:manage">
             <Button size="sm" onClick={() => save(setting.key)} disabled={savingKey === setting.key}>
               {savingKey === setting.key ? <Loader2 className="animate-spin size-4" /> : <Save className="size-4 mr-1" />} Kaydet
             </Button>
@@ -250,7 +250,7 @@ export default function AdminSettings() {
                       <div className="text-sm font-medium">{m.label}</div>
                       <div className="text-[10px] font-mono text-muted-foreground">{m.code} · {m.asset}/{m.network}</div>
                     </div>
-                    <Can do="settings:update">
+                    <Can do="settings:manage">
                       <Switch
                         checked={m.is_active}
                         disabled={savingMethod === m.code}
@@ -277,7 +277,7 @@ export default function AdminSettings() {
                       />
                     </div>
                   </div>
-                  <Can do="settings:update">
+                  <Can do="settings:manage">
                     <Button
                       size="sm"
                       className="mt-3"

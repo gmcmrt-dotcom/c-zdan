@@ -261,6 +261,13 @@ async function fetchPlatformEconomics(
             AND metadata ? 'merchant_fee'
         ), 0)
         + COALESCE((
+          SELECT sum(fee)::numeric
+          FROM merchant_cashout_sessions
+          WHERE status = 'success'
+            AND finalized_at >= ${periodFrom}::timestamptz
+            AND finalized_at <  ${periodTo}::timestamptz
+        ), 0)
+        + COALESCE((
           SELECT sum(our_commission)::numeric
           FROM provider_ledger
           WHERE status = 'success'

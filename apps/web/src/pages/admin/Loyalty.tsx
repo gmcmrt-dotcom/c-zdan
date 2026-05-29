@@ -22,6 +22,8 @@ type Rule = {
    id: string; key: string; description: string; value: number; is_active: boolean;
 };
 
+const SUB_LEVEL_LABELS = ["Plus", "Pro", "Prime"] as const;
+
 export default function AdminLoyalty() {
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
@@ -34,7 +36,7 @@ export default function AdminLoyalty() {
        dbSelect<Tier>("loyalty_tiers", {
          cols: "id, level_name, sub_rank, display_name, min_points, min_turnover, point_multiplier, cashback_pct, sort_order, is_archived",
          where: { is_archived: false },
-         order: { col: "sort_order" },
+         order: { col: "sort_order", asc: true },
        }).catch(() => [] as Tier[]),
        dbSelect<Rule>("loyalty_rules", { order: { col: "key" } }).catch(() => [] as Rule[]),
      ]);
@@ -105,7 +107,7 @@ export default function AdminLoyalty() {
                    <Badge variant="outline">{tier.level_name}</Badge>
                    <h3 className="font-semibold text-lg" >{tier.display_name}</h3>
                    <span className="text-xs text-muted-foreground">
-                     Barem {tier.sub_rank + 1}/3 · sıra {tier.sort_order}
+                     {SUB_LEVEL_LABELS[tier.sub_rank] ?? `Barem ${tier.sub_rank + 1}`} · sıra {tier.sort_order}
                    </span>
                  </div>
                  <Button size="sm" onClick={() => saveTier(tier)} disabled={savingId === tier.id}>

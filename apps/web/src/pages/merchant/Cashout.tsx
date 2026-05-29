@@ -58,6 +58,7 @@ export default function MerchantCashout() {
   const [selectedMerchantId, setSelectedMerchantId] = useState("");
   const [methodCode, setMethodCode] = useState("");
   const [amount, setAmount] = useState("");
+  const [commission, setCommission] = useState("");
   const [address, setAddress] = useState("");
   const [canCreate, setCanCreate] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -132,8 +133,12 @@ export default function MerchantCashout() {
     [merchants, selectedMerchantId],
   );
   const amountNum = Number(amount || 0);
+  const isUsdt = methodCode.toUpperCase().startsWith("USDT_");
+  const commissionNum = Number(commission || 0);
   const fee = selectedMerchant && Number.isFinite(amountNum) && amountNum > 0
-    ? Math.round(((amountNum * Number(selectedMerchant.cashout_commission_pct ?? 0) / 100) + Number(selectedMerchant.cashout_fixed_fee ?? 0)) * 100) / 100
+    ? isUsdt
+      ? (Number.isFinite(commissionNum) && commissionNum >= 0 ? Math.round(commissionNum * 100) / 100 : 0)
+      : Math.round(((amountNum * Number(selectedMerchant.cashout_commission_pct ?? 0) / 100) + Number(selectedMerchant.cashout_fixed_fee ?? 0)) * 100) / 100
     : 0;
   const totalDebit = amountNum + fee;
   const available = selectedMerchant
@@ -144,6 +149,9 @@ export default function MerchantCashout() {
     if (!selectedMerchant) return toast.error("Bayi/merchant seçin");
     if (!methodCode) return toast.error("Yöntem seçin");
     if (!amountNum || amountNum <= 0) return toast.error("Geçerli tutar girin");
+    if (isUsdt && (!Number.isFinite(commissionNum) || commissionNum < 0)) {
+      return toast.error("USDT çekiminde platform komisyonu (gelir) zorunludur");
+    }
     if (!address.trim()) return toast.error("Cüzdan adresi gerekli");
     setSubmitting(true);
     try {
@@ -154,6 +162,7 @@ export default function MerchantCashout() {
           method_code: methodCode,
           amount: amountNum,
           payout_address: address.trim(),
+          ...(isUsdt ? { commission: commissionNum } : {}),
         },
       );
       if (!data?.success) {
@@ -162,6 +171,7 @@ export default function MerchantCashout() {
       }
       toast.success(`Tahsilat talebi oluşturuldu: ${data.public_no ?? data.session_id}`);
       setAmount("");
+      setCommission("");
       setAddress("");
       await load();
     } catch (err) {
@@ -234,6 +244,20 @@ export default function MerchantCashout() {
               <Label>Tutar (₺)</Label>
               <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
             </div>
+            {isUsdt && (
+              <div className="md:col-span-2">
+                <Label>Platform komisyonu (₺) — gelir</Label>
+                <Input
+                  inputMode="decimal"
+                  value={commission}
+                  onChange={(e) => setCommission(e.target.value)}
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  USDT tahsilatında komisyon tutarı platform geliri olarak kaydedilir.
+                </p>
+              </div>
+            )}
             <div className="md:col-span-2">
               <Label>Kripto cüzdan adresi</Label>
               <Input value={address} onChange={(e) => setAddress(e.target.value)} className="font-mono text-xs" placeholder="Adres" />
@@ -244,7 +268,7 @@ export default function MerchantCashout() {
             <div><span className="text-muted-foreground">Komisyon</span><div className="font-semibold">{fmtTRY(fee)}</div></div>
             <div><span className="text-muted-foreground">Rezerve</span><div className="font-semibold">{fmtTRY(totalDebit || 0)}</div></div>
           </div>
-          <Button onClick={submit} disabled={!canCreate || !selectedMerchant || submitting || totalDebit <= 0 || totalDebit > available}>
+          <Button onClick={submit} disabled={!canCreate || !selectedMerchant || submitting || totalDebit <= 0 || totalDebit > available || (isUsdt && commission.trim() === "")}>
             {submitting ? <Loader2 className="animate-spin size-4 mr-1" /> : null}
             Tahsilat talebi oluştur
           </Button>

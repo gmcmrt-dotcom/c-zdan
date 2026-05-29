@@ -55,7 +55,7 @@ export default function Loyalty() {
         dbSelect<any>("loyalty_tiers", {
           cols: "id, level_name, display_name, min_points, min_turnover, point_multiplier, cashback_pct, sort_order, is_archived",
           where: { is_archived: false },
-          order: { col: "sort_order" },
+          order: { col: "sort_order", asc: true },
         }).catch(() => [] as any[]),
         dbSelect<any>("loyalty_points_log", {
           where: { user_id: user.id },
