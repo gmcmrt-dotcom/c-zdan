@@ -985,13 +985,17 @@ async function main() {
       },
     });
     await call("bo.merchant-owner.cashout-request", "POST", "/api/fn/merchant-cashout-request", {
-      expect: (s, j) => s === 200 && j?.error?.code === "CASHOUT_DISABLED",
+      expect: (s, j) =>
+        s === 200 &&
+        (j?.data?.success === true ||
+          j?.error?.code === "INSUFFICIENT_MERCHANT_BALANCE"),
       headers: FIX_MO,
       body: {
         merchant_id: "e5000001-0000-4000-8000-000000000001",
-        method_code: "usdt_trc20",
-        amount: 10,
+        method_code: "USDT_TRC20",
+        amount: 50,
         payout_address: "TSmokeFixtureAddress00000000001",
+        commission: 2.5,
       },
     });
   }

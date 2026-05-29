@@ -676,7 +676,27 @@
       "earnTier": "Seviyen büyür, kazancın büyür",
       "earnTierDesc": "Üst seviyelerde aynı harcamadan çok daha fazla puan kazanırsın. Cashback şimdilik kapalıdır.",
       "tierMultiplier": "{{multiplier}}× çarpan",
-      "pointsSuffix": "puan"
+      "pointsSuffix": "puan",
+      "tiersLegendShort": "Her alt seviye için hem puan hem toplam harcama (turnover) gerekir. Çarpan, aynı ödemede kazandığın puanı büyütür.",
+      "tiersLegendPoints": "Puan: Mağazada ödeme yaptıkça biriken sadakat puanın.",
+      "tiersLegendTurnover": "Turnover: Cüzdanından yapılan toplam harcama tutarı.",
+      "tiersLegendMultiplier": "Çarpan: Seviye yükseldikçe her ödemede daha fazla puan kazanırsın.",
+      "family": {
+        "rookie": "Rookie",
+        "silver": "Silver",
+        "gold": "Gold",
+        "platinum": "Platinum",
+        "diamond": "Diamond",
+        "elite": "Elite"
+      },
+      "familyDesc": {
+        "rookie": "Başlangıç — yeni üyeler buradan başlar",
+        "silver": "Düzenli alışveriş yapanlar",
+        "gold": "Aktif cüzdan kullanıcıları",
+        "platinum": "Yüksek hacimli harcama",
+        "diamond": "Premium sadakat seviyesi",
+        "elite": "En üst seviye — maksimum çarpan"
+      }
     },
     "profile": {
       "title": "Profil",

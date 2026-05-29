@@ -10,9 +10,9 @@ import MemberLayout from "@/components/MemberLayout";
 import { StatValue } from "@/components/ui/stat-card";
 import { memberCardPadLg, memberGrid2 } from "@/lib/member-layout";
 import { cn } from "@/lib/utils";
-import { Star, ChevronDown, Flame, ShoppingBag, TrendingUp, AlertTriangle } from "lucide-react";
+import { Star, Flame, ShoppingBag, TrendingUp, AlertTriangle } from "lucide-react";
+import { LoyaltyTierList } from "@/components/loyalty/LoyaltyTierList";
 import { fmtNumber, fmtTRY, pointReasonLabel } from "@/lib/format";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useTranslation } from "react-i18next";
 
@@ -44,9 +44,6 @@ export default function Loyalty() {
   const [summary, setSummary] = useState<LoyaltySummary | null>(null);
   const [tiers, setTiers] = useState<any[]>([]);
   const [points, setPoints] = useState<any[]>([]);
-  const [prevOpen, setPrevOpen] = useState(false);
-  const [nextOpen, setNextOpen] = useState(false);
-
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -186,6 +183,25 @@ export default function Loyalty() {
         </div>
       </div>
 
+      {/* Puan geçmişi */}
+      <div className="mt-4">
+        <h2 className="text-sm font-semibold mb-3">{t("member.loyalty.pointsHistory")}</h2>
+        <div className="soft-card rounded-2xl divide-y divide-border overflow-hidden">
+          {points.length === 0 && <div className="p-6 text-center text-sm text-muted-foreground">{t("member.loyalty.noPoints")}</div>}
+          {points.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 p-4">
+              <div className="flex-1">
+                <div className="text-sm font-medium">{pointReasonLabel(p.reason)}</div>
+                <div className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString(i18n.language?.startsWith("en") ? "en-US" : "tr-TR")}</div>
+              </div>
+              <div className={`text-sm font-semibold tabular ${p.points >= 0 ? "text-success" : "text-destructive"}`}>
+                {p.points >= 0 ? "+" : ""}{fmtNumber(p.points)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Nasıl puan kazanırım? */}
       <div className="mt-6">
         <div className="soft-card rounded-2xl overflow-hidden">
@@ -237,96 +253,10 @@ export default function Loyalty() {
       {/* Tüm tier'lar */}
       <div className="mt-6">
         <h2 className="text-sm font-semibold mb-3">{t("member.loyalty.allTiers")}</h2>
-        <div className="soft-card rounded-2xl divide-y divide-border overflow-hidden">
-          {(() => {
-            const currentTier = tiers.find((t) => t.id === summary.current_tier_id);
-            if (!currentTier) {
-              return tiers.map((tier) => <TierRow key={tier.id} tier={tier} />);
-            }
-            const previousTiers = tiers.filter((tier) => tier.sort_order < currentTier.sort_order);
-            const nextTiers = tiers.filter((tier) => tier.sort_order > currentTier.sort_order);
-            return (
-              <>
-                {previousTiers.length > 0 && (
-                  <Collapsible open={prevOpen} onOpenChange={setPrevOpen}>
-                    <CollapsibleTrigger className="flex items-center justify-between p-3 w-full text-left hover:bg-muted/40 transition-colors [&[data-state=open]_svg]:rotate-180">
-                      <span className="text-sm font-medium">
-                        {t("member.loyalty.previousTiersCount", { n: previousTiers.length })}
-                      </span>
-                      <ChevronDown className="size-4 transition-transform text-muted-foreground" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="divide-y divide-border border-t border-border">
-                        {previousTiers.map((tier) => <TierRow key={tier.id} tier={tier} />)}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-                <div className="p-3 bg-primary/5 flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">{currentTier.display_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      ×{Number(currentTier.point_multiplier).toFixed(2)} {t("member.loyalty.multiplierSuffix")}
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold text-primary">{t("member.loyalty.current")}</span>
-                </div>
-                {nextTiers.length > 0 && (
-                  <Collapsible open={nextOpen} onOpenChange={setNextOpen}>
-                    <CollapsibleTrigger className="flex items-center justify-between p-3 w-full text-left hover:bg-muted/40 transition-colors [&[data-state=open]_svg]:rotate-180">
-                      <span className="text-sm font-medium">
-                        {t("member.loyalty.nextTiersCount", { n: nextTiers.length })}
-                      </span>
-                      <ChevronDown className="size-4 transition-transform text-muted-foreground" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="divide-y divide-border border-t border-border">
-                        {nextTiers.map((tier) => <TierRow key={tier.id} tier={tier} />)}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      </div>
-
-      {/* Puan geçmişi */}
-      <div className="mt-6">
-        <h2 className="text-sm font-semibold mb-3">{t("member.loyalty.pointsHistory")}</h2>
-        <div className="soft-card rounded-2xl divide-y divide-border overflow-hidden">
-          {points.length === 0 && <div className="p-6 text-center text-sm text-muted-foreground">{t("member.loyalty.noPoints")}</div>}
-          {points.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 p-4">
-              <div className="flex-1">
-                <div className="text-sm font-medium">{pointReasonLabel(p.reason)}</div>
-                <div className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString(i18n.language?.startsWith("en") ? "en-US" : "tr-TR")}</div>
-              </div>
-              <div className={`text-sm font-semibold tabular ${p.points >= 0 ? "text-success" : "text-destructive"}`}>
-                {p.points >= 0 ? "+" : ""}{fmtNumber(p.points)}
-              </div>
-            </div>
-          ))}
-        </div>
+        <LoyaltyTierList tiers={tiers} currentTierId={summary.current_tier_id} />
       </div>
 
       <div className="h-6" />
     </MemberLayout>
-  );
-}
-
-function TierRow({ tier }: { tier: any }) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex items-center gap-3 p-3">
-      <div className="flex-1">
-        <div className="text-sm font-medium">{tier.display_name}</div>
-        <div className="text-xs text-muted-foreground">
-          {fmtNumber(tier.min_points)} {t("member.loyalty.pointsSuffix")} · {fmtTRY(tier.min_turnover)} {t("member.loyalty.turnoverSuffix")}
-          <span className="ml-2">×{Number(tier.point_multiplier).toFixed(2)}</span>
-        </div>
-      </div>
-    </div>
   );
 }

@@ -676,7 +676,27 @@
       "earnTier": "Bigger tier, bigger reward",
       "earnTierDesc": "At higher tiers, the same payment earns more points. Cashback is currently off.",
       "tierMultiplier": "{{multiplier}}× multiplier",
-      "pointsSuffix": "pts"
+      "pointsSuffix": "pts",
+      "tiersLegendShort": "Each sub-level needs both points and total spend (turnover). The multiplier boosts points on every payment.",
+      "tiersLegendPoints": "Points: loyalty points earned from merchant payments.",
+      "tiersLegendTurnover": "Turnover: total amount spent from your wallet.",
+      "tiersLegendMultiplier": "Multiplier: higher tiers earn more points on the same payment.",
+      "family": {
+        "rookie": "Rookie",
+        "silver": "Silver",
+        "gold": "Gold",
+        "platinum": "Platinum",
+        "diamond": "Diamond",
+        "elite": "Elite"
+      },
+      "familyDesc": {
+        "rookie": "Starter — every member begins here",
+        "silver": "For regular shoppers",
+        "gold": "Active wallet users",
+        "platinum": "High-volume spenders",
+        "diamond": "Premium loyalty tier",
+        "elite": "Top tier — maximum multiplier"
+      }
     },
     "profile": {
       "title": "Profile",

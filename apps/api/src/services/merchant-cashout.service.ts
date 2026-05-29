@@ -158,7 +158,9 @@ export async function requestMerchantCashout(opts: {
       WHERE id = ${merchant.id}
       FOR UPDATE
     `);
-    const row = (locked as unknown as Array<{ id: string; balance: string; cashout_reserved_amount: string }>)[0];
+    const row = locked as unknown as
+      | { id: string; balance: string; cashout_reserved_amount: string }
+      | undefined;
     if (!row) throw new NotFoundError("MERCHANT_NOT_FOUND");
 
     const avail =
