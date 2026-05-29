@@ -5,7 +5,18 @@
 > in git. Full audit roadmap (with per-finding citations) lives in
 > `.cursor/plans/wallet_production_go-live_audit_591d4884.plan.md`.
 
-**Last updated:** 2026-05-29 (login API crash fix — K5 shared DTO)
+**Last updated:** 2026-05-29 (proje taşındı — Documents/Claude/Projects)
+
+## Yerel proje yolu ✅ (2026-05-29)
+
+Proje `Downloads/Telegram Desktop` altından taşındı.
+
+| | |
+|---|---|
+| **Yeni yol** | `/Users/muratgemici/Documents/Claude/Projects/WT-AfterSurgery` |
+| **Eski yol** | `~/Downloads/Telegram Desktop/WT-AfterSurgery` (artık kullanılmıyor) |
+
+**Dev:** Tüm komutları yeni kökten çalıştırın — `cd /Users/muratgemici/Documents/Claude/Projects/WT-AfterSurgery && npm run dev` (API `:3000` + web `:8080`).
 
 ## Login "Beklenmeyen bir hata" ✅ (2026-05-29)
 
